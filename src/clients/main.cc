@@ -195,35 +195,97 @@ namespace app {
                 return devices;
             }
 
+            auto is_device_suitable( VkPhysicalDevice device ) {
+                VkPhysicalDeviceProperties device_properties;
+                VkPhysicalDeviceFeatures device_features;
+                VkPhysicalDeviceMemoryProperties device_memory_properties;
+
+                vkGetPhysicalDeviceProperties( device, &device_properties );
+                vkGetPhysicalDeviceFeatures( device, &device_features );
+                vkGetPhysicalDeviceMemoryProperties( device, &device_memory_properties );
+
+                const bool is_gpu = device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+
+                uint32_t queue_family_count = 0;
+                vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
+
+                std::vector<VkQueueFamilyProperties> queue_families;
+                queue_families.resize( queue_family_count );
+                vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, std::data( queue_families ));
+
+                bool is_present_graphics = false;
+                auto queue_family_index = 0u;
+                auto idx = 0u;
+                for ( const auto& queue_family : queue_families ) {
+                    if (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                        is_present_graphics = true;
+                        queue_family_index = idx;
+                    }
+
+                    idx++;
+                }
+
+                return is_gpu & is_present_graphics;
+            }
+
+            [[nodiscard]] auto pick_physical_device( const VkInstance instance ) {
+                LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
+
+                auto physical_devices = enumerate_physical_devices( instance );
+                if ( physical_devices.empty( ) )
+                    return false;
+
+                auto selected_device_index = 0u;
+                for (const auto& device : physical_devices) {
+                    if ( is_device_suitable( device ) )
+                        break;
+
+                    selected_device_index++;
+                }
+
+                if (selected_device_index > physical_devices.size()) {
+                    LOG_ERROR( VULKAN_TAG, "%1", "Invalid device index" );
+                    return false;
+                }
+
+                auto selected_device = physical_devices[selected_device_index];
+
+                return true;
+            }
+
         } // namespace detail
 
-        [[nodiscard]] auto pick_physical_device( const VkInstance instance ) {
+        struct context {
+            context() = default;
+
+            VkInstance instance;
+            bool debugging = false;
+        };
+
+        [[nodiscard]] auto init( const bool debugging_flag = true ) -> std::optional<context> {
             using namespace detail;
 
-            LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
+            context ctx;
 
-            auto physical_devices = enumerate_physical_devices( instance );
-            if ( physical_devices.empty( ) )
-                return false;
+            auto instance = create_instance( debugging_flag );
+            if ( !instance )
+                return {};
 
-            const auto selected_device_index = 0;
+            if ( debugging_flag )
+                if ( !debugging::setup( instance.value( ) ) )
+                    return {};
 
-            VkPhysicalDeviceProperties device_properties;
-            VkPhysicalDeviceFeatures device_features;
-            VkPhysicalDeviceMemoryProperties device_memory_properties;
-            auto selected_device = physical_devices[selected_device_index];
+            if ( !pick_physical_device( instance.value( ) ) )
+                return {};
 
-            vkGetPhysicalDeviceProperties( selected_device, &device_properties );
-            vkGetPhysicalDeviceFeatures( selected_device, &device_features );
-            vkGetPhysicalDeviceMemoryProperties( selected_device, &device_memory_properties );
-
-            return true;
+            return ctx;
         }
 
-        [[nodiscard]] auto init( ) {
-        }
+        auto cleanup( context& ctx) {
+            if ( ctx.debugging )
+                vulkan::debugging::cleanup( ctx.instance );
 
-        auto cleanup( ) {
+            vulkan::destroy_instance( ctx.instance );
         }
 
     } // namespace vulkan
@@ -247,27 +309,15 @@ namespace app {
     auto run( std::function<void( const detail::event & )> on_event ) {
         LOG_DEBUG( APP_TAG, "%1", "Start running" );
 
-        const auto debugging = true;
-
-        auto instance = vulkan::create_instance( debugging );
-        if ( !instance )
+        auto vk_ctx = vulkan::init();
+        if (!vk_ctx)
             return EXIT_FAILURE;
-
-        if ( debugging )
-            if ( !vulkan::debugging::setup( instance.value( ) ) )
-                return EXIT_FAILURE;
-
-        if ( !vulkan::pick_physical_device( instance.value( ) ) )
-            return EXIT_FAILURE;
-
-        if ( debugging )
-            vulkan::debugging::cleanup( instance.value( ) );
-
-        vulkan::destroy_instance( instance.value( ) );
 
         on_event(detail::on_init{});
 
         on_event(detail::on_done{});
+
+        vulkan::cleanup(vk_ctx.value());
 
         return EXIT_SUCCESS;
     }
