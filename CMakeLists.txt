@@ -12,6 +12,7 @@ set(SOURCES
 
 find_package(GLM REQUIRED)
 find_package(Vulkan REQUIRED)
+find_package(XCB REQUIRED)
 
 configure_file("${SHARED_INCLUDE_DIR}/config.h.in" "${SHARED_INCLUDE_DIR}/config.hh")
 
@@ -26,8 +27,8 @@ set_target_properties(${APP_NAME} PROPERTIES
 target_include_directories(${APP_NAME} PUBLIC
     ${SHARED_INCLUDE_DIR}
     ${GLM_INCLUDE_DIR}
-    ${SDL2_INCLUDE_DIRS}
     ${VULKAN_INCLUDE_DIR}
+    ${XCB_INCLUDES}
     external
 )
 
@@ -54,6 +55,7 @@ endif()
 target_link_libraries(${APP_NAME} PUBLIC
     ${APP_LIBRARIES}
     ${VULKAN_LIBRARY}
+    ${XCB_LIBRARIES}
 )
 
 target_compile_definitions(${APP_NAME} PUBLIC -DVK_USE_PLATFORM_XCB_KHR)
