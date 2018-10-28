@@ -63,6 +63,8 @@ namespace vulkan {
         queue_parameters graphics_queue = {};
         queue_parameters present_queue = {};
         VkSurfaceKHR presentation_surface = VK_NULL_HANDLE;
+        VkCommandPool present_queue_command_pool = VK_NULL_HANDLE;
+        std::vector<VkCommandBuffer> present_queue_command_buffers;
         swap_chain_info swap_chain = {};
         VkSemaphore image_available;
         VkSemaphore rendering_finished;
@@ -658,6 +660,14 @@ namespace vulkan {
             swap_chain_create_info.clipped = VK_TRUE;
             swap_chain_create_info.oldSwapchain = old_swap_chain;
 
+            if ( surface_capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT ) {
+                swap_chain_create_info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+            }
+
+            if ( surface_capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT ) {
+                swap_chain_create_info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            }
+
             if ( vkCreateSwapchainKHR( device, &swap_chain_create_info, nullptr, &swap_chain) != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not create swap chain!" );
                 return {};
@@ -728,6 +738,116 @@ namespace vulkan {
             return {sems[0], sems[1]};
         }
 
+        auto create_command_buffers( VkDevice device, VkSwapchainKHR swap_chain, const uint32_t present_queue_family_index )
+            -> std::optional<std::tuple<VkCommandPool, std::vector<VkCommandBuffer>>> {
+
+            VkCommandPoolCreateInfo command_pool_create_info;
+            command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            command_pool_create_info.pNext = nullptr;
+            command_pool_create_info.flags = 0;
+            command_pool_create_info.queueFamilyIndex = present_queue_family_index;
+
+            VkCommandPool present_queue_command_pool;
+            if ( const auto res = vkCreateCommandPool( device, &command_pool_create_info, nullptr, &present_queue_command_pool );
+                 res != VK_SUCCESS ) {
+                LOG_ERROR( VULKAN_TAG, "%1 Could not create a command pool!", res );
+                return {};
+            }
+
+            uint32_t image_count = 0;
+            if ( const auto res = vkGetSwapchainImagesKHR( device, swap_chain, &image_count, nullptr );
+                 ( res != VK_SUCCESS ) || ( image_count == 0 ) ) {
+                LOG_ERROR( VULKAN_TAG, "%1", "Could not get swap chain images!" );
+                return {};
+            }
+
+            std::vector<VkCommandBuffer> present_queue_command_buffers;
+            present_queue_command_buffers.resize( image_count );
+
+            VkCommandBufferAllocateInfo command_buffer_allocate_info;
+            command_buffer_allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            command_buffer_allocate_info.pNext = nullptr;
+            command_buffer_allocate_info.commandPool = present_queue_command_pool;
+            command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            command_buffer_allocate_info.commandBufferCount = image_count;
+
+            if ( vkAllocateCommandBuffers( device, &command_buffer_allocate_info, present_queue_command_buffers.data( ) ) != VK_SUCCESS ) {
+                LOG_ERROR( VULKAN_TAG, "%1", "Could not allocate command buffers!" );
+                return {};
+            }
+
+            return {std::make_tuple( present_queue_command_pool, present_queue_command_buffers )};
+        }
+
+        //
+        auto record_command_buffers( VkDevice device, VkSwapchainKHR swap_chain, const std::vector<VkCommandBuffer> &present_queue_command_buffers ) {
+            auto image_count = static_cast<uint32_t>( present_queue_command_buffers.size( ) );
+
+            std::vector<VkImage> swap_chain_images( image_count );
+            if ( const auto res = vkGetSwapchainImagesKHR( device, swap_chain, &image_count, swap_chain_images.data( ) );
+                 res != VK_SUCCESS ) {
+                LOG_ERROR( VULKAN_TAG, "%1", "Could not get swap chain images!" );
+                return false;
+            }
+
+            VkCommandBufferBeginInfo command_buffer_begin_info = {};
+            command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            command_buffer_begin_info.pNext = nullptr;
+            command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+            command_buffer_begin_info.pInheritanceInfo = nullptr;
+
+            const VkClearColorValue clear_color = {{1.0f, 0.8f, 0.4f, 0.0f}};
+
+            VkImageSubresourceRange image_subresource_range = {};
+            image_subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            image_subresource_range.baseMipLevel = 0;
+            image_subresource_range.levelCount = 1;
+            image_subresource_range.baseArrayLayer = 0;
+            image_subresource_range.layerCount = 1;
+
+            for ( uint32_t i = 0; i < image_count; ++i ) {
+                VkImageMemoryBarrier barrier_from_present_to_clear = {};
+                barrier_from_present_to_clear.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier_from_present_to_clear.pNext = nullptr;
+                barrier_from_present_to_clear.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+                barrier_from_present_to_clear.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                barrier_from_present_to_clear.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                barrier_from_present_to_clear.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                barrier_from_present_to_clear.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier_from_present_to_clear.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier_from_present_to_clear.image = swap_chain_images[i];
+                barrier_from_present_to_clear.subresourceRange = image_subresource_range;
+
+                VkImageMemoryBarrier barrier_from_clear_to_present = {};
+                barrier_from_clear_to_present.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier_from_clear_to_present.pNext = nullptr;
+                barrier_from_clear_to_present.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                barrier_from_clear_to_present.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+                barrier_from_clear_to_present.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                barrier_from_clear_to_present.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+                barrier_from_clear_to_present.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier_from_clear_to_present.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier_from_clear_to_present.image = swap_chain_images[i];
+                barrier_from_clear_to_present.subresourceRange = image_subresource_range;
+
+                vkBeginCommandBuffer( present_queue_command_buffers[i], &command_buffer_begin_info );
+                vkCmdPipelineBarrier( present_queue_command_buffers[i], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                                      0, nullptr, 0, nullptr, 1, &barrier_from_present_to_clear );
+
+                vkCmdClearColorImage( present_queue_command_buffers[i], swap_chain_images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                      &clear_color, 1, &image_subresource_range );
+
+                vkCmdPipelineBarrier( present_queue_command_buffers[i], VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier_from_clear_to_present );
+                if ( vkEndCommandBuffer( present_queue_command_buffers[i] ) != VK_SUCCESS ) {
+                    LOG_ERROR( VULKAN_TAG, "%1", "Could not record command buffers!" );
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
     } // namespace detail
 
     [[nodiscard]] auto init( xcb_connection_t *connection, xcb_window_t window, const bool debugging_flag = true )
@@ -793,6 +913,18 @@ namespace vulkan {
         if ( ctx.rendering_finished = rendering_finished; rendering_finished == VK_NULL_HANDLE )
             return {};
 
+        auto command_buffers = create_command_buffers( ctx.device, ctx.swap_chain.swap_chain, ctx.present_queue.family_index );
+        if ( !command_buffers )
+            return {};
+
+        auto [command_pool, buffers] = command_buffers.value();
+        ctx.present_queue_command_pool = command_pool;
+        ctx.present_queue_command_buffers = buffers;
+
+        if ( !record_command_buffers( ctx.device, ctx.swap_chain.swap_chain, ctx.present_queue_command_buffers ) ) {
+            return {};
+        }
+
         return ctx;
     }
 
@@ -800,6 +932,18 @@ namespace vulkan {
         LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
         using namespace detail;
+
+        if ( ( ctx.present_queue_command_buffers.size( ) > 0 ) && ( ctx.present_queue_command_buffers[0] != VK_NULL_HANDLE ) ) {
+            vkFreeCommandBuffers( ctx.device, ctx.present_queue_command_pool,
+                                  static_cast<uint32_t>( ctx.present_queue_command_buffers.size( ) ),
+                                  ctx.present_queue_command_buffers.data( ) );
+            ctx.present_queue_command_buffers.clear( );
+        }
+
+        if ( ctx.present_queue_command_pool != VK_NULL_HANDLE ) {
+            vkDestroyCommandPool( ctx.device, ctx.present_queue_command_pool, nullptr );
+            ctx.present_queue_command_pool = VK_NULL_HANDLE;
+        }
 
         if ( ctx.image_available != VK_NULL_HANDLE )
             vkDestroySemaphore( ctx.device, ctx.image_available, nullptr );
