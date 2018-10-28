@@ -64,7 +64,9 @@ namespace vulkan {
         queue_parameters present_queue = {};
         VkSurfaceKHR presentation_surface = VK_NULL_HANDLE;
         swap_chain_info swap_chain = {};
-        bool debugging = false;
+        VkSemaphore image_available;
+        VkSemaphore rendering_finished;
+        bool is_debugging = false;
     };
 
     namespace debugging {
@@ -703,7 +705,30 @@ namespace vulkan {
             }
         }
 
-    } // namespace detail    
+        auto create_semaphores( VkDevice device ) -> std::tuple<VkSemaphore, VkSemaphore> {
+            LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
+
+            VkSemaphoreCreateInfo semaphore_create_info;
+            semaphore_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            semaphore_create_info.pNext = nullptr;
+            semaphore_create_info.flags = 0;
+
+            VkSemaphore sems[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+
+            if ( const auto res = vkCreateSemaphore( device, &semaphore_create_info, nullptr, &sems[0] );
+                 res != VK_SUCCESS ) {
+                LOG_ERROR( VULKAN_TAG, "%1", "Could not create semaphores!" );
+            }
+
+            if ( const auto res = vkCreateSemaphore( device, &semaphore_create_info, nullptr, &sems[1] );
+                 res != VK_SUCCESS ) {
+                LOG_ERROR( VULKAN_TAG, "%1", "Could not create semaphores!" );
+            }
+
+            return {sems[0], sems[1]};
+        }
+
+    } // namespace detail
 
     [[nodiscard]] auto init( xcb_connection_t *connection, xcb_window_t window, const bool debugging_flag = true )
         -> std::optional<context> {
@@ -722,7 +747,7 @@ namespace vulkan {
                 return {};
 
         ctx.instance = instance.value( );
-        ctx.debugging = debugging_flag;
+        ctx.is_debugging = debugging_flag;
 
         VkXcbSurfaceCreateInfoKHR surface_create_info = {};
         surface_create_info.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
@@ -761,17 +786,30 @@ namespace vulkan {
 
         ctx.swap_chain = swap_chain.value();
 
+        auto [image_available, rendering_finished] = create_semaphores( ctx.device );
+        if ( ctx.image_available = image_available; image_available == VK_NULL_HANDLE )
+            return {};
+
+        if ( ctx.rendering_finished = rendering_finished; rendering_finished == VK_NULL_HANDLE )
+            return {};
+
         return ctx;
     }
 
     auto cleanup( context &ctx ) noexcept {
         LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
-        using namespace detail;        
+        using namespace detail;
+
+        if ( ctx.image_available != VK_NULL_HANDLE )
+            vkDestroySemaphore( ctx.device, ctx.image_available, nullptr );
+
+        if ( ctx.rendering_finished != VK_NULL_HANDLE )
+            vkDestroySemaphore( ctx.device, ctx.rendering_finished, nullptr );
 
         destroy_swap_chain( ctx.device, ctx.swap_chain );
 
-        if ( ctx.debugging )
+        if ( ctx.is_debugging )
             debugging::cleanup( ctx.instance );
 
         destroy_logical_device( ctx.device );
