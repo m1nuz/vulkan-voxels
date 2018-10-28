@@ -35,6 +35,38 @@ namespace common {
 
 namespace vulkan {
 
+    struct queue_parameters {
+        VkQueue handle = VK_NULL_HANDLE;
+        uint32_t family_index = 0;
+    };
+
+    struct image_info {
+        VkImage image = VK_NULL_HANDLE;
+        VkImageView image_view = VK_NULL_HANDLE;
+        VkSampler sampler = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+    };
+
+    struct swap_chain_info {
+        VkSwapchainKHR swap_chain = VK_NULL_HANDLE;
+        VkFormat format = VK_FORMAT_UNDEFINED;
+        std::vector<image_info> images;
+        VkExtent2D extent;
+    };
+
+    struct context {
+        context( ) = default;
+
+        VkInstance instance = VK_NULL_HANDLE;
+        VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+        VkDevice device = VK_NULL_HANDLE;
+        queue_parameters graphics_queue = {};
+        queue_parameters present_queue = {};
+        VkSurfaceKHR presentation_surface = VK_NULL_HANDLE;
+        swap_chain_info swap_chain = {};
+        bool debugging = false;
+    };
+
     namespace debugging {
 
         const char *validation_layer_names[] = {"VK_LAYER_LUNARG_standard_validation"};
@@ -402,7 +434,7 @@ namespace vulkan {
             return device;
         }
 
-        auto destroy_logical_device( VkDevice device ) {
+        auto destroy_logical_device( VkDevice device ) noexcept {
             LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
             if ( const auto res = vkDeviceWaitIdle( device ); res != VK_SUCCESS )
@@ -411,7 +443,127 @@ namespace vulkan {
             vkDestroyDevice( device, nullptr );
         }
 
-        auto create_swap_chain( VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR presentation_surface ) {
+        inline auto get_swap_chain_num_images( VkSurfaceCapabilitiesKHR &surface_capabilities ) {
+            uint32_t image_count = surface_capabilities.minImageCount + 2;
+            if ( ( surface_capabilities.maxImageCount > 0 ) && ( image_count > surface_capabilities.maxImageCount ) ) {
+                image_count = surface_capabilities.maxImageCount;
+            }
+
+            return image_count;
+        }
+
+        inline auto get_swap_chain_format( std::vector<VkSurfaceFormatKHR> &surface_formats ) {
+            if ( ( surface_formats.size( ) == 1 ) && ( surface_formats[0].format == VK_FORMAT_UNDEFINED ) ) {
+                return VkSurfaceFormatKHR{VK_FORMAT_R8G8B8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR};
+            }
+
+            for ( VkSurfaceFormatKHR &surface_format : surface_formats ) {
+                if ( surface_format.format == VK_FORMAT_R8G8B8A8_UNORM ) {
+                    return surface_format;
+                }
+            }
+
+            return surface_formats[0];
+        }
+
+        inline auto get_swap_chain_extent( VkSurfaceCapabilitiesKHR &surface_capabilities ) {
+            if ( surface_capabilities.currentExtent.width == -1 ) {
+                VkExtent2D swap_chain_extent = {640, 480};
+                if ( swap_chain_extent.width < surface_capabilities.minImageExtent.width ) {
+                    swap_chain_extent.width = surface_capabilities.minImageExtent.width;
+                }
+                if ( swap_chain_extent.height < surface_capabilities.minImageExtent.height ) {
+                    swap_chain_extent.height = surface_capabilities.minImageExtent.height;
+                }
+                if ( swap_chain_extent.width > surface_capabilities.maxImageExtent.width ) {
+                    swap_chain_extent.width = surface_capabilities.maxImageExtent.width;
+                }
+                if ( swap_chain_extent.height > surface_capabilities.maxImageExtent.height ) {
+                    swap_chain_extent.height = surface_capabilities.maxImageExtent.height;
+                }
+                return swap_chain_extent;
+            }
+
+            return surface_capabilities.currentExtent;
+        }
+
+        inline auto get_swap_chain_usage_flags( VkSurfaceCapabilitiesKHR &surface_capabilities ) {
+            if ( surface_capabilities.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT ) {
+                return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            }
+
+            LOG_ERROR( VULKAN_TAG, "%1", "VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT image usage is not supported by the swap chain!" );
+
+            return static_cast<VkImageUsageFlagBits>( -1 );
+        }
+
+        inline auto get_swap_chain_transform( VkSurfaceCapabilitiesKHR &surface_capabilities ) {
+            if ( surface_capabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR ) {
+                return VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+            } else {
+                return surface_capabilities.currentTransform;
+            }
+        }
+
+        inline auto get_swap_chain_present_mode( const std::vector<VkPresentModeKHR> &present_modes ) {
+            for ( const auto &present_mode : present_modes ) {
+                if ( present_mode == VK_PRESENT_MODE_MAILBOX_KHR ) {
+                    return present_mode;
+                }
+            }
+
+            for ( const auto &present_mode : present_modes ) {
+                if ( present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR ) {
+                    return present_mode;
+                }
+            }
+
+            for ( const auto &present_mode : present_modes ) {
+                if ( present_mode == VK_PRESENT_MODE_FIFO_KHR ) {
+                    return present_mode;
+                }
+            }
+
+            LOG_ERROR( VULKAN_TAG, "%1", "FIFO present mode is not supported by the swap chain!" );
+
+            return static_cast<VkPresentModeKHR>( -1 );
+        }
+
+        auto create_swap_chain_image_views( VkDevice device, const VkFormat format, const std::vector<VkImage> &images ) -> std::vector<image_info> {
+            if ( images.empty( ) )
+                return {};
+
+            std::vector<image_info> image_infos;
+            image_infos.resize( images.size( ) );
+
+            size_t ix = 0;
+            for ( const auto img : images ) {
+                image_infos[ix].image = img;
+
+                VkImageViewCreateInfo image_view_create_info = {};
+                image_view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+                image_view_create_info.pNext = nullptr;
+                image_view_create_info.flags = 0;
+                image_view_create_info.image = images[ix];
+                image_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                image_view_create_info.format = format;
+                image_view_create_info.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                     VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
+                image_view_create_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+                if ( const auto res = vkCreateImageView( device, &image_view_create_info, nullptr, &image_infos[ix].image_view );
+                     res != VK_SUCCESS ) {
+                    LOG_ERROR( VULKAN_TAG, "%1 Could not create image view for framebuffer!", res);
+                }
+
+                ix++;
+            }
+
+            return image_infos;
+        }
+
+        [[nodiscard]] auto create_swap_chain( VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR presentation_surface,
+                                VkSwapchainKHR swap_chain ) -> std::optional< swap_chain_info > {
             LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
             if ( device != VK_NULL_HANDLE ) {
@@ -423,7 +575,7 @@ namespace vulkan {
                  res != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "(%1) Could not check presentation surface capabilities!", error_string( res ) );
 
-                return false;
+                return {};
             }
 
             uint32_t formats_count;
@@ -432,30 +584,126 @@ namespace vulkan {
 
                 LOG_ERROR( VULKAN_TAG, "(%1) Error occurred during presentation surface formats enumeration!", error_string( res ) );
 
-                return false;
+                return {};
             }
 
-            return true;
+            std::vector<VkSurfaceFormatKHR> surface_formats;
+            surface_formats.resize( formats_count );
+            if ( const auto res =
+                     vkGetPhysicalDeviceSurfaceFormatsKHR( physical_device, presentation_surface, &formats_count, surface_formats.data( ) );
+                 res != VK_SUCCESS ) {
+                LOG_ERROR( VULKAN_TAG, "(%1) Error occurred during presentation surface formats enumeration!", error_string( res ) );
+                return {};
+            }
+
+            uint32_t present_modes_count;
+            if ( const auto res =
+                     vkGetPhysicalDeviceSurfacePresentModesKHR( physical_device, presentation_surface, &present_modes_count, nullptr );
+                 ( res != VK_SUCCESS ) || ( present_modes_count == 0 ) ) {
+                LOG_ERROR( VULKAN_TAG, "(%1) Error occurred during presentation surface present modes enumeration!", error_string( res ) );
+                return {};
+            }
+
+            std::vector<VkPresentModeKHR> present_modes;
+            present_modes.resize( present_modes_count );
+
+            if ( const auto res = vkGetPhysicalDeviceSurfacePresentModesKHR( physical_device, presentation_surface, &present_modes_count,
+                                                                             present_modes.data( ) );
+                 res != VK_SUCCESS ) {
+                LOG_ERROR( VULKAN_TAG, "(%1) Error occurred during presentation surface present modes enumeration!", error_string( res ) );
+                return {};
+            }
+
+            const auto desired_number_of_images = get_swap_chain_num_images( surface_capabilities );
+            const auto desired_format = get_swap_chain_format( surface_formats );
+            const auto desired_extent = get_swap_chain_extent( surface_capabilities );
+            const auto desired_usage = get_swap_chain_usage_flags( surface_capabilities );
+            const auto desired_transform = get_swap_chain_transform( surface_capabilities );
+            const auto desired_present_mode = get_swap_chain_present_mode( present_modes );
+
+            if ( static_cast<int>( desired_usage ) == -1 ) {
+                return {};
+            }
+
+            if ( static_cast<int>( desired_present_mode ) == -1 ) {
+                return {};
+            }
+
+            if ( (desired_extent.width == 0) || (desired_extent.height == 0) ) {
+                LOG_ERROR( VULKAN_TAG, "%1", "Can't create swap chain" );
+                return {};
+            }
+
+            auto old_swap_chain = swap_chain;
+
+            VkSwapchainCreateInfoKHR swap_chain_create_info;
+            swap_chain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+            swap_chain_create_info.pNext = nullptr;
+            swap_chain_create_info.flags = 0;
+            swap_chain_create_info.surface = presentation_surface;
+            swap_chain_create_info.minImageCount = desired_number_of_images;
+            swap_chain_create_info.imageFormat = desired_format.format;
+            swap_chain_create_info.imageColorSpace = desired_format.colorSpace;
+            swap_chain_create_info.imageExtent = desired_extent;
+            swap_chain_create_info.imageArrayLayers = 1;
+            swap_chain_create_info.imageUsage = desired_usage;
+            swap_chain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            swap_chain_create_info.queueFamilyIndexCount = 0;
+            swap_chain_create_info.pQueueFamilyIndices = nullptr;
+            swap_chain_create_info.preTransform = desired_transform;
+            swap_chain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+            swap_chain_create_info.presentMode = desired_present_mode;
+            swap_chain_create_info.clipped = VK_TRUE;
+            swap_chain_create_info.oldSwapchain = old_swap_chain;
+
+            if ( vkCreateSwapchainKHR( device, &swap_chain_create_info, nullptr, &swap_chain) != VK_SUCCESS ) {
+                LOG_ERROR( VULKAN_TAG, "%1", "Could not create swap chain!" );
+                return {};
+            }
+
+            if ( old_swap_chain != VK_NULL_HANDLE ) {
+                vkDestroySwapchainKHR( device, old_swap_chain, nullptr );
+            }
+
+            uint32_t image_count = 0;
+            if ( const auto res = vkGetSwapchainImagesKHR( device, swap_chain, &image_count, nullptr );
+                 ( res != VK_SUCCESS ) || ( image_count == 0 ) ) {
+                LOG_ERROR( VULKAN_TAG, "%1", "Could not get swap chain images!" );
+                return {};
+            }
+
+            std::vector<VkImage> images;
+            images.resize( image_count );
+            if ( const auto res = vkGetSwapchainImagesKHR( device, swap_chain, &image_count, images.data( ) );
+                 res != VK_SUCCESS ) {
+                LOG_ERROR( VULKAN_TAG, "%1", "Could not get swap chain images!" );
+                return {};
+            }
+
+            swap_chain_info info;
+            info.swap_chain = swap_chain;
+            info.format = desired_format.format;
+            info.extent = desired_extent;
+            info.images = create_swap_chain_image_views( device, desired_format.format, images );
+
+            return info;
         }
 
-    } // namespace detail
+        auto destroy_swap_chain( VkDevice device,  swap_chain_info &swap_chain ) {
+            LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
-    struct queue_parameters {
-        VkQueue handle = VK_NULL_HANDLE;
-        uint32_t family_index = 0;
-    };
+            if (swap_chain.swap_chain != VK_NULL_HANDLE) {
+                vkDestroySwapchainKHR( device, swap_chain.swap_chain, nullptr );
+                swap_chain.swap_chain = VK_NULL_HANDLE;
+            }
 
-    struct context {
-        context( ) = default;
+            for ( auto& img : swap_chain.images ) {
+                vkDestroyImageView( device, img.image_view, nullptr );
+                img.image_view = VK_NULL_HANDLE;
+            }
+        }
 
-        VkInstance instance = VK_NULL_HANDLE;
-        VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-        VkDevice device = VK_NULL_HANDLE;
-        queue_parameters graphics_queue = {};
-        queue_parameters present_queue = {};
-        VkSurfaceKHR presentation_surface;
-        bool debugging = false;
-    };
+    } // namespace detail    
 
     [[nodiscard]] auto init( xcb_connection_t *connection, xcb_window_t window, const bool debugging_flag = true )
         -> std::optional<context> {
@@ -507,7 +755,11 @@ namespace vulkan {
         vkGetDeviceQueue( ctx.device, ctx.graphics_queue.family_index, 0, &ctx.graphics_queue.handle );
         vkGetDeviceQueue( ctx.device, ctx.present_queue.family_index, 0, &ctx.present_queue.handle );
 
-        create_swap_chain( ctx.physical_device, ctx.device, ctx.presentation_surface );
+        const auto swap_chain = create_swap_chain( ctx.physical_device, ctx.device, ctx.presentation_surface, ctx.swap_chain.swap_chain );
+        if (!swap_chain)
+            return {};
+
+        ctx.swap_chain = swap_chain.value();
 
         return ctx;
     }
@@ -515,7 +767,9 @@ namespace vulkan {
     auto cleanup( context &ctx ) noexcept {
         LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
-        using namespace detail;
+        using namespace detail;        
+
+        destroy_swap_chain( ctx.device, ctx.swap_chain );
 
         if ( ctx.debugging )
             debugging::cleanup( ctx.instance );
@@ -697,6 +951,8 @@ namespace app {
         auto last_time = current_time;
         auto dt_accumulator = 0.0;
         auto timesteps = 0ull;
+
+        LOG_INFO( APP_TAG, "%1", "Running..." );
 
         // Main message loop
         bool running = true;
