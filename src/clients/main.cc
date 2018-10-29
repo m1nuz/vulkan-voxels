@@ -5,6 +5,7 @@
 #include <iterator>
 #include <optional>
 #include <variant>
+#include <mutex>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -24,6 +25,12 @@ constexpr char VULKAN_TAG[] = "Vulkan";
 constexpr char VULKAN_DBG_TAG[] = "Vulkan.Dbg";
 
 #define LOG_DEBUG_CHECKPOINT( tag ) LOG_DEBUG( tag, "%1", __FUNCTION__ )
+#define LOG_DEBUG_CHECKPOINT_ONCE( tag ) do { \
+    const auto this_fn = __FUNCTION__; \
+    static std::once_flag __FUNCTION__##once_flag;\
+    std::call_once( __FUNCTION__##once_flag, [this_fn] () { LOG_DEBUG( tag, "%1", this_fn ); } ); \
+    ; \
+    } while( 0 )
 
 namespace common {
 
@@ -533,7 +540,8 @@ namespace vulkan {
             return static_cast<VkPresentModeKHR>( -1 );
         }
 
-        auto create_swap_chain_image_views( VkDevice device, const VkFormat format, const std::vector<VkImage> &images ) -> std::vector<image_info> {
+        auto create_swap_chain_image_views( VkDevice device, const VkFormat format, const std::vector<VkImage> &images )
+            -> std::vector<image_info> {
             if ( images.empty( ) )
                 return {};
 
@@ -557,7 +565,7 @@ namespace vulkan {
 
                 if ( const auto res = vkCreateImageView( device, &image_view_create_info, nullptr, &image_infos[ix].image_view );
                      res != VK_SUCCESS ) {
-                    LOG_ERROR( VULKAN_TAG, "%1 Could not create image view for framebuffer!", res);
+                    LOG_ERROR( VULKAN_TAG, "%1 Could not create image view for framebuffer!", res );
                 }
 
                 ix++;
@@ -567,7 +575,7 @@ namespace vulkan {
         }
 
         [[nodiscard]] auto create_swap_chain( VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR presentation_surface,
-                                VkSwapchainKHR swap_chain ) -> std::optional< swap_chain_info > {
+                                              VkSwapchainKHR swap_chain ) -> std::optional<swap_chain_info> {
             LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
             if ( device != VK_NULL_HANDLE ) {
@@ -633,7 +641,7 @@ namespace vulkan {
                 return {};
             }
 
-            if ( (desired_extent.width == 0) || (desired_extent.height == 0) ) {
+            if ( ( desired_extent.width == 0 ) || ( desired_extent.height == 0 ) ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Can't create swap chain" );
                 return {};
             }
@@ -668,7 +676,7 @@ namespace vulkan {
                 swap_chain_create_info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
             }
 
-            if ( vkCreateSwapchainKHR( device, &swap_chain_create_info, nullptr, &swap_chain) != VK_SUCCESS ) {
+            if ( vkCreateSwapchainKHR( device, &swap_chain_create_info, nullptr, &swap_chain ) != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not create swap chain!" );
                 return {};
             }
@@ -686,8 +694,7 @@ namespace vulkan {
 
             std::vector<VkImage> images;
             images.resize( image_count );
-            if ( const auto res = vkGetSwapchainImagesKHR( device, swap_chain, &image_count, images.data( ) );
-                 res != VK_SUCCESS ) {
+            if ( const auto res = vkGetSwapchainImagesKHR( device, swap_chain, &image_count, images.data( ) ); res != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not get swap chain images!" );
                 return {};
             }
@@ -701,15 +708,15 @@ namespace vulkan {
             return info;
         }
 
-        auto destroy_swap_chain( VkDevice device,  swap_chain_info &swap_chain ) {
+        auto destroy_swap_chain( VkDevice device, swap_chain_info &swap_chain ) {
             LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
-            if (swap_chain.swap_chain != VK_NULL_HANDLE) {
+            if ( swap_chain.swap_chain != VK_NULL_HANDLE ) {
                 vkDestroySwapchainKHR( device, swap_chain.swap_chain, nullptr );
                 swap_chain.swap_chain = VK_NULL_HANDLE;
             }
 
-            for ( auto& img : swap_chain.images ) {
+            for ( auto &img : swap_chain.images ) {
                 vkDestroyImageView( device, img.image_view, nullptr );
                 img.image_view = VK_NULL_HANDLE;
             }
@@ -725,13 +732,11 @@ namespace vulkan {
 
             VkSemaphore sems[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
 
-            if ( const auto res = vkCreateSemaphore( device, &semaphore_create_info, nullptr, &sems[0] );
-                 res != VK_SUCCESS ) {
+            if ( const auto res = vkCreateSemaphore( device, &semaphore_create_info, nullptr, &sems[0] ); res != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not create semaphores!" );
             }
 
-            if ( const auto res = vkCreateSemaphore( device, &semaphore_create_info, nullptr, &sems[1] );
-                 res != VK_SUCCESS ) {
+            if ( const auto res = vkCreateSemaphore( device, &semaphore_create_info, nullptr, &sems[1] ); res != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not create semaphores!" );
             }
 
@@ -780,7 +785,8 @@ namespace vulkan {
         }
 
         //
-        auto record_command_buffers( VkDevice device, VkSwapchainKHR swap_chain, const std::vector<VkCommandBuffer> &present_queue_command_buffers ) {
+        auto record_command_buffers( VkDevice device, VkSwapchainKHR swap_chain,
+                                     const std::vector<VkCommandBuffer> &present_queue_command_buffers ) {
             auto image_count = static_cast<uint32_t>( present_queue_command_buffers.size( ) );
 
             std::vector<VkImage> swap_chain_images( image_count );
@@ -796,7 +802,7 @@ namespace vulkan {
             command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
             command_buffer_begin_info.pInheritanceInfo = nullptr;
 
-            const VkClearColorValue clear_color = {{1.0f, 0.8f, 0.4f, 0.0f}};
+            const VkClearColorValue clear_color = {{0.23f, 0.23f, 0.23f, 0.0f}};
 
             VkImageSubresourceRange image_subresource_range = {};
             image_subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -901,10 +907,10 @@ namespace vulkan {
         vkGetDeviceQueue( ctx.device, ctx.present_queue.family_index, 0, &ctx.present_queue.handle );
 
         const auto swap_chain = create_swap_chain( ctx.physical_device, ctx.device, ctx.presentation_surface, ctx.swap_chain.swap_chain );
-        if (!swap_chain)
+        if ( !swap_chain )
             return {};
 
-        ctx.swap_chain = swap_chain.value();
+        ctx.swap_chain = swap_chain.value( );
 
         auto [image_available, rendering_finished] = create_semaphores( ctx.device );
         if ( ctx.image_available = image_available; image_available == VK_NULL_HANDLE )
@@ -917,7 +923,7 @@ namespace vulkan {
         if ( !command_buffers )
             return {};
 
-        auto [command_pool, buffers] = command_buffers.value();
+        auto [command_pool, buffers] = command_buffers.value( );
         ctx.present_queue_command_pool = command_pool;
         ctx.present_queue_command_buffers = buffers;
 
@@ -932,6 +938,8 @@ namespace vulkan {
         LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
         using namespace detail;
+
+        vkDeviceWaitIdle( ctx.device );
 
         if ( ( ctx.present_queue_command_buffers.size( ) > 0 ) && ( ctx.present_queue_command_buffers[0] != VK_NULL_HANDLE ) ) {
             vkFreeCommandBuffers( ctx.device, ctx.present_queue_command_pool,
@@ -959,6 +967,59 @@ namespace vulkan {
         destroy_logical_device( ctx.device );
 
         destroy_instance( ctx.instance );
+    }
+
+    auto submit_and_present( context &ctx ) {
+        LOG_DEBUG_CHECKPOINT_ONCE( VULKAN_TAG );
+
+        uint32_t image_index = 0;
+        switch ( const auto result = vkAcquireNextImageKHR( ctx.device, ctx.swap_chain.swap_chain, UINT64_MAX, ctx.image_available,
+                                                            VK_NULL_HANDLE, &image_index );
+                 result ) {
+        case VK_SUCCESS:
+        case VK_SUBOPTIMAL_KHR:
+            break;
+        case VK_ERROR_OUT_OF_DATE_KHR:
+            break;
+        default:
+            LOG_ERROR( VULKAN_TAG, "%1", "Problem occurred during swap chain image acquisition!", result );
+        }
+
+        const VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        VkSubmitInfo submit_info = {};
+        submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submit_info.pNext = nullptr;
+        submit_info.waitSemaphoreCount = 1;
+        submit_info.pWaitSemaphores = &ctx.image_available;
+        submit_info.pWaitDstStageMask = &wait_dst_stage_mask;
+        submit_info.commandBufferCount = 1;
+        submit_info.pCommandBuffers = &ctx.present_queue_command_buffers[image_index];
+        submit_info.signalSemaphoreCount = 1;
+        submit_info.pSignalSemaphores = &ctx.rendering_finished;
+
+        if ( const auto res = vkQueueSubmit( ctx.present_queue.handle, 1, &submit_info, VK_NULL_HANDLE ); res != VK_SUCCESS ) {
+            LOG_ERROR( VULKAN_TAG, "%1 Submit error!", res );
+        }
+
+        VkPresentInfoKHR present_info = {};
+        present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        present_info.pNext = nullptr;
+        present_info.waitSemaphoreCount = 1;
+        present_info.pWaitSemaphores = &ctx.rendering_finished;
+        present_info.swapchainCount = 1;
+        present_info.pSwapchains = &ctx.swap_chain.swap_chain;
+        present_info.pImageIndices = &image_index;
+        present_info.pResults = nullptr;
+
+        switch ( const auto result = vkQueuePresentKHR( ctx.present_queue.handle, &present_info ); result ) {
+        case VK_SUCCESS:
+            break;
+        case VK_ERROR_OUT_OF_DATE_KHR:
+        case VK_SUBOPTIMAL_KHR:
+            break;
+        default:
+            LOG_ERROR( VULKAN_TAG, "%1 Problem occurred during image presentation!", result );
+        }
     }
 
 } // namespace vulkan
@@ -1112,16 +1173,16 @@ namespace app {
     } // namespace detail
 
     auto run( std::function<void( const detail::event & )> on_event ) {
-        LOG_INFO( APP_TAG, "%1", "Start running" );
+        LOG_INFO( APP_TAG, "%1", "Startup" );
 
-        auto instance = detail::create_instance( );
-        if ( !instance ) {
+        auto display_instance = detail::create_instance( );
+        if ( !display_instance ) {
             LOG_ERROR( APP_TAG, "%1", "Couldn't create application instance" );
             return EXIT_FAILURE;
         }
 
-        auto vk_ctx = vulkan::init( instance.value( ).connection, instance.value( ).window );
-        if ( !vk_ctx ) {
+        auto vk_instance = vulkan::init( display_instance.value( ).connection, display_instance.value( ).window );
+        if ( !vk_instance ) {
             LOG_ERROR( APP_TAG, "%1", "Couldn't init vulkan" );
             return EXIT_FAILURE;
         }
@@ -1140,12 +1201,12 @@ namespace app {
         bool running = true;
         while ( running ) {
             xcb_generic_event_t *event;
-            while ( event = xcb_poll_for_event( instance.value( ).connection ) ) {
+            while ( event = xcb_poll_for_event( display_instance.value( ).connection ) ) {
                 switch ( event->response_type & 0x7f ) {
                 case XCB_CLIENT_MESSAGE: {
-                    if ( ( *(xcb_client_message_event_t *)event ).data.data32[0] == ( *instance.value( ).atom_wm_delete_window ).atom ) {
+                    if ( ( *(xcb_client_message_event_t *)event ).data.data32[0] == ( *display_instance.value( ).atom_wm_delete_window ).atom ) {
                         running = false;
-                        free( instance.value( ).atom_wm_delete_window );
+                        free( display_instance.value( ).atom_wm_delete_window );
                     }
                     break;
                 }
@@ -1193,15 +1254,17 @@ namespace app {
             }
 
             on_event( detail::on_present{dt_accumulator / timestep, timesteps} );
+
+            vulkan::submit_and_present( vk_instance.value( ) );
         }
 
         on_event( detail::on_done{} );
 
-        vulkan::cleanup( vk_ctx.value( ) );
+        vulkan::cleanup( vk_instance.value( ) );
 
-        detail::destroy_instance( instance.value( ) );
+        detail::destroy_instance( display_instance.value( ) );
 
-        LOG_INFO( APP_TAG, "%1", "App exit" );
+        LOG_INFO( APP_TAG, "%1", "Exit" );
 
         return EXIT_SUCCESS;
     }
@@ -1216,13 +1279,13 @@ extern int main( int argc, char *argv[] ) {
                 using T = std::decay_t<decltype( arg )>;
 
                 if constexpr ( std::is_same_v<T, app::detail::on_init> ) {
-                    LOG_INFO( APP_TAG, "%1", "App init" );
+                    LOG_INFO( APP_TAG, "%1", "Init" );
                 } else if constexpr ( std::is_same_v<T, app::detail::on_update> ) {
-                    // LOG_INFO( APP_TAG, "%1", "App update" );
+                    // LOG_INFO( APP_TAG, "%1", "Update" );
                 } else if constexpr ( std::is_same_v<T, app::detail::on_present> ) {
                     // LOG_INFO( APP_TAG, "App present %1 %2", arg.interpolation, arg.timesteps );
                 } else if constexpr ( std::is_same_v<T, app::detail::on_done> ) {
-                    LOG_INFO( APP_TAG, "%1", "App done" );
+                    LOG_INFO( APP_TAG, "%1", "Done" );
                 }
             },
             ev );
