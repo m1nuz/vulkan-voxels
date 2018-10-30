@@ -1,0 +1,49 @@
+# Enable C++ support
+language: cpp
+sudo: required
+dist: trusty
+
+addons:
+  apt:
+    sources:
+        - ubuntu-toolchain-r-test
+        - llvm-toolchain-trusty-4.0
+    packages:
+        - cmake
+        - cmake-data
+        - ninja-build
+        - clang-6.0
+        - gcc-7
+        - g++-7
+
+env:
+  matrix:
+    # GCC
+    - MATRIX_EVAL="CC=/usr/bin/gcc-7 && CXX=/usr/bin/g++-7" CMAKE_BUILD_TYPE="Debug"
+    - MATRIX_EVAL="CC=/usr/bin/gcc-7 && CXX=/usr/bin/g++-7" CMAKE_BUILD_TYPE="Release"
+    # Clang
+    - MATRIX_EVAL="CC=/usr/bin/clang-6.0 && CXX=/usr/bin/clang++-6.0" CMAKE_BUILD_TYPE="Debug"
+    - MATRIX_EVAL="CC=/usr/bin/clang-6.0 && CXX=/usr/bin/clang++-6.0" CMAKE_BUILD_TYPE="Release"
+
+before_install:
+  - eval "${MATRIX_EVAL}"
+
+# Install dependencies
+install:
+  - sudo apt-get update -qq
+  # Verify cmake versions
+  - cmake --version
+
+# Only watch the master branch
+branches:
+  only:
+    - master
+
+# Build steps
+script:
+  - uname -a
+  - $CXX --version
+  - mkdir build
+  - cd build
+  - cmake -G Ninja -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" ..
+  - cmake --build .
