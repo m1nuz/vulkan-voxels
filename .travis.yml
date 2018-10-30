@@ -44,7 +44,7 @@ install:
   # Verify cmake versions
   - cmake --version
   # Vulkan SDK
-  - curl https://sdk.lunarg.com/sdk/download/latest/linux/vulkan-sdk.tar.gz
+  - wget -O vulkan-sdk.tar.gz https://sdk.lunarg.com/sdk/download/1.1.85.0/linux/vulkansdk-linux-x86_64-1.1.85.0.tar.gz\?Human\=true\;u\=
   - mkdir vulkan-sdk
   - tar zxf vulkan-sdk.tar.gz -C vulkan-sdk --strip-components=1
 
