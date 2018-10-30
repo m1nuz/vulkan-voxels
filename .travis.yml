@@ -33,6 +33,8 @@ install:
   - sudo apt-get update -qq
   # Verify cmake versions
   - cmake --version
+  # Vulkan SDK
+  - curl https://vulkan.lunarg.com/sdk/home#sdk/downloadConfirm/latest/linux/vulkan-sdk.tar.gz
 
 # Only watch the master branch
 branches:
