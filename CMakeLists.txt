@@ -7,8 +7,13 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 set(APP_NAME vv-client)
 set(INSTALL_DIR /usr/bin)
 set(SHARED_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(HEADERS
+    include/vulkan.h
+    include/config.hh)
 set(SOURCES
-    src/clients/main.cc)
+    src/clients/syswm.h
+    src/clients/main.cc
+    src/clients/xcbwm.cc)
 
 find_package(GLM REQUIRED)
 find_package(Vulkan REQUIRED)

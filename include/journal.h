@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <ctime>
+#include <mutex>
 
 #define LOG_LEVEL_CRITICAL 1
 #define LOG_LEVEL_ERROR 2
@@ -48,5 +49,13 @@
 #define LOG_MESSAGE(tag, ...) if (log_level >= LOG_LEVEL_MESSAGE) LOG(stdout, "\x1b[32mM", "\x1b[0m\n", tag, __VA_ARGS__)
 #define LOG_INFO(tag, ...) if (log_level >= LOG_LEVEL_INFO) LOG(stdout, "I", "\x1b[0m\n", tag, __VA_ARGS__)
 #define LOG_DEBUG(tag, ...) if (log_level >= LOG_LEVEL_DEBUG) LOG(stdout, "\x1b[36mD", "\x1b[0m\n", tag, __VA_ARGS__)
+
+#define LOG_DEBUG_CHECKPOINT( tag ) LOG_DEBUG( tag, "%1", __FUNCTION__ )
+#define LOG_DEBUG_CHECKPOINT_ONCE( tag ) do { \
+    const auto this_fn = __FUNCTION__; \
+    static std::once_flag __FUNCTION__##once_flag;\
+    std::call_once( __FUNCTION__##once_flag, [this_fn] () { LOG_DEBUG( tag, "%1", this_fn ); } ); \
+    ; \
+    } while( 0 )
 
 extern volatile int log_level;
