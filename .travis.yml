@@ -58,6 +58,7 @@ script:
   - uname -a
   - $CXX --version
   - export VK_SDK_PATH=$(pwd)/vulkan-sdk/x86_64
+  - export VULKAN_SDK=$(pwd)/vulkan-sdk/x86_64
   - mkdir build
   - cd build
   - cmake -G Ninja -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_FLAGS="${EXTRA_FLAGS}" ..
