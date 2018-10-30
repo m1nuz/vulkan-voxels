@@ -40,10 +40,13 @@ before_install:
 # Install dependencies
 install:
   - sudo apt-get update -qq
+  - sudo apt-get install -qq libc++-dev libc++abi-dev libx11-xcb-dev libxrandr-dev libglm-dev libx11-dev
   # Verify cmake versions
   - cmake --version
   # Vulkan SDK
-  - curl https://vulkan.lunarg.com/sdk/home#sdk/downloadConfirm/latest/linux/vulkan-sdk.tar.gz
+  - curl https://sdk.lunarg.com/sdk/download/latest/linux/vulkan-sdk.tar.gz
+  - mkdir vulkan-sdk
+  - tar zxf vulkan-sdk.tar.gz -C vulkan-sdk --strip-components=1
 
 # Only watch the master branch
 branches:
@@ -54,6 +57,7 @@ branches:
 script:
   - uname -a
   - $CXX --version
+  - export VK_SDK_PATH=$(pwd)/vulkan-sdk/x86_64
   - mkdir build
   - cd build
   - cmake -G Ninja -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_FLAGS="${EXTRA_FLAGS}" ..
