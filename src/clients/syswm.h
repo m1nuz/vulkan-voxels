@@ -63,7 +63,7 @@ namespace app {
         struct on_present {
             on_present( ) = default;
 
-            on_present( const float interpolation, const uint64_t timesteps ) : interpolation{interpolation}, timesteps{timesteps} {
+            on_present( const float _interpolation, const uint64_t _timesteps ) : interpolation{_interpolation}, timesteps{_timesteps} {
             }
 
             float interpolation = 0.f;

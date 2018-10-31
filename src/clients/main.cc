@@ -37,7 +37,7 @@ namespace app {
 
         on_event( syswm::on_init{} );
 
-        constexpr auto timestep = 0.005f;
+        constexpr auto timestep = 0.005;
         auto current_time = std::chrono::high_resolution_clock::now( );
         auto last_time = current_time;
         auto dt_accumulator = 0.0;
@@ -62,7 +62,9 @@ namespace app {
                 timesteps++;
             }
 
-            on_event( syswm::on_present{dt_accumulator / timestep, timesteps} );
+            const auto interpolation = dt_accumulator / timestep;
+
+            on_event( syswm::on_present{static_cast<float>( interpolation ), timesteps} );
 
             vulkan::submit_and_present( vk_instance.value( ) );
         }
@@ -81,6 +83,7 @@ namespace app {
 } // namespace app
 
 extern int main( int argc, char *argv[] ) {
+    (void)argc, (void)argv;
 
     return app::run( []( const auto &ev ) {
         std::visit(

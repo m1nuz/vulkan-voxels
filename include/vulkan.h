@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstring>
+
 #include <vulkan/vulkan.h>
 
 constexpr char VULKAN_TAG[] = "Vulkan";
@@ -7,7 +9,7 @@ constexpr char VULKAN_DBG_TAG[] = "Vulkan.Dbg";
 
 namespace common {
 
-    template <typename T> constexpr inline auto make_version( auto major, auto minor, auto patch ) -> T {
+    template <typename T> constexpr inline auto make_version( const T major, const T minor, const T patch ) -> T {
         return ( ( ( major ) << 22 ) | ( ( minor ) << 12 ) | ( patch ) );
     }
 
@@ -61,6 +63,7 @@ namespace vulkan {
                                                              VkDebugUtilsMessageTypeFlagsEXT messageType,
                                                              const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
                                                              void *pUserData ) noexcept {
+            (void)messageSeverity, (void)messageType, (void)pUserData;
 
             LOG_ERROR( VULKAN_DBG_TAG, " %1 %2", pCallbackData->messageIdNumber, pCallbackData->pMessage );
 
@@ -203,7 +206,7 @@ namespace vulkan {
         [[nodiscard]] auto check_extension_availability( std::string_view extension_name,
                                                          const std::vector<VkExtensionProperties> &available_extensions ) noexcept {
             for ( const auto &ext : available_extensions ) {
-                if ( strcmp( ext.extensionName, extension_name.data( ) ) == 0 ) {
+                if ( std::strcmp( ext.extensionName, extension_name.data( ) ) == 0 ) {
                     return true;
                 }
             }
@@ -353,7 +356,7 @@ namespace vulkan {
             if ( physical_devices.empty( ) )
                 return {};
 
-            auto selected_device_index = 0;
+            auto selected_device_index = 0u;
             for ( const auto &device : physical_devices ) {
                 if ( is_device_suitable( device, presentation_surface, selected_graphics_queue_family_index,
                                          selected_present_queue_family_index ) )
@@ -451,7 +454,7 @@ namespace vulkan {
         }
 
         inline auto get_swap_chain_extent( VkSurfaceCapabilitiesKHR &surface_capabilities ) {
-            if ( surface_capabilities.currentExtent.width == -1 ) {
+            if ( surface_capabilities.currentExtent.width == static_cast<uint32_t>( -1 ) ) {
                 VkExtent2D swap_chain_extent = {640, 480};
                 if ( swap_chain_extent.width < surface_capabilities.minImageExtent.width ) {
                     swap_chain_extent.width = surface_capabilities.minImageExtent.width;

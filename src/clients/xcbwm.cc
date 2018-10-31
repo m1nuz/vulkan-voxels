@@ -11,7 +11,7 @@ namespace app {
 
         namespace detail {
             static inline auto intern_atom_helper( xcb_connection_t *conn, bool only_if_exists, const char *str ) {
-                auto cookie = xcb_intern_atom( conn, only_if_exists, strlen( str ), str );
+                auto cookie = xcb_intern_atom( conn, only_if_exists, static_cast<uint16_t>(strlen( str )), str );
                 return xcb_intern_atom_reply( conn, cookie, nullptr );
             }
 
@@ -88,10 +88,10 @@ namespace app {
 
             auto poll_events( instance_t &instance ) noexcept -> void {
                 xcb_generic_event_t *event;
-                while ( event = xcb_poll_for_event( instance.connection ) ) {
+                while ( ( event = xcb_poll_for_event( instance.connection ) ) ) {
                     switch ( event->response_type & 0x7f ) {
                     case XCB_CLIENT_MESSAGE: {
-                        if ( ( *(xcb_client_message_event_t *)event ).data.data32[0] ==
+                        if ( reinterpret_cast<xcb_client_message_event_t *>( event )->data.data32[0] ==
                              ( *instance.atom_wm_delete_window ).atom ) {
                             instance.running = false;
                             free( instance.atom_wm_delete_window );
@@ -99,24 +99,24 @@ namespace app {
                         break;
                     }
                     case XCB_MOTION_NOTIFY: {
-                        const auto motion = reinterpret_cast<const xcb_motion_notify_event_t *>( event );
+                        //const auto motion = reinterpret_cast<const xcb_motion_notify_event_t *>( event );
                         break;
                     }
                     case XCB_BUTTON_PRESS: {
-                        const auto press = reinterpret_cast<const xcb_button_press_event_t *>( event );
+                        //const auto press = reinterpret_cast<const xcb_button_press_event_t *>( event );
                         break;
                     }
                     case XCB_BUTTON_RELEASE: {
-                        const auto release = reinterpret_cast<const xcb_button_release_event_t *>( event );
+                        //const auto release = reinterpret_cast<const xcb_button_release_event_t *>( event );
                         break;
                     }
                     case XCB_KEY_PRESS: {
-                        const auto key_press = reinterpret_cast<const xcb_key_release_event_t *>( event );
+                        //const auto key_press = reinterpret_cast<const xcb_key_release_event_t *>( event );
                         instance.running = false;
                         break;
                     }
                     case XCB_KEY_RELEASE: {
-                        const auto key_release = reinterpret_cast<const xcb_key_release_event_t *>( event );
+                        //const auto key_release = reinterpret_cast<const xcb_key_release_event_t *>( event );
                         break;
                     }
                     case XCB_DESTROY_NOTIFY: {
