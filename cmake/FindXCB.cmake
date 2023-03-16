@@ -1,11 +1,11 @@
 # - FindXCB
 #
-# Copyright (C) 2015 Valve Corporation
+# Copyright 2015 Valve Coporation
 
 find_package(PkgConfig)
 
 if(NOT XCB_FIND_COMPONENTS)
-    set(XCB_FIND_COMPONENTS xcb)
+    set(XCB_FIND_COMPONENTS xcb xcb-icccm)
 endif()
 
 include(FindPackageHandleStandardArgs)

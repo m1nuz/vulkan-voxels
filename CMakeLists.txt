@@ -11,9 +11,9 @@ set(HEADERS
     include/vulkan.h
     include/config.hh)
 set(SOURCES
-    src/clients/syswm.h
-    src/clients/main.cc
-    src/clients/xcbwm.cc)
+    src/clients/application.hpp
+    src/clients/client.cpp
+)
 
 find_package(GLM REQUIRED)
 find_package(Vulkan REQUIRED)
@@ -37,8 +37,6 @@ target_include_directories(${APP_NAME} PUBLIC
     external
 )
 
-target_compile_definitions(${APP_NAME} PUBLIC ${APP_DEFINES})
-
 if (UNIX)
     target_compile_options(${APP_NAME} PUBLIC
         -pthread
@@ -56,6 +54,8 @@ elseif (MSVC)
 #        /WX
         )
 endif()
+
+message(XCB_LIBRARIES=${XCB_LIBRARIES})
 
 target_link_libraries(${APP_NAME} PUBLIC
     ${APP_LIBRARIES}

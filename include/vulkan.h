@@ -1,8 +1,13 @@
 #pragma once
 
-#include <cstring>
-
 #include <vulkan/vulkan.h>
+
+#include <journal.h>
+
+#include <cstring>
+#include <optional>
+#include <string>
+#include <vector>
 
 constexpr char VULKAN_TAG[] = "Vulkan";
 constexpr char VULKAN_DBG_TAG[] = "Vulkan.Dbg";
@@ -33,7 +38,7 @@ namespace vulkan {
         VkSwapchainKHR swap_chain = VK_NULL_HANDLE;
         VkFormat format = VK_FORMAT_UNDEFINED;
         std::vector<image_info> images;
-        VkExtent2D extent = {};
+        VkExtent2D extent = { };
     };
 
     struct context {
@@ -42,12 +47,12 @@ namespace vulkan {
         VkInstance instance = VK_NULL_HANDLE;
         VkPhysicalDevice physical_device = VK_NULL_HANDLE;
         VkDevice device = VK_NULL_HANDLE;
-        queue_parameters graphics_queue = {};
-        queue_parameters present_queue = {};
+        queue_parameters graphics_queue = { };
+        queue_parameters present_queue = { };
         VkSurfaceKHR presentation_surface = VK_NULL_HANDLE;
         VkCommandPool present_queue_command_pool = VK_NULL_HANDLE;
         std::vector<VkCommandBuffer> present_queue_command_buffers;
-        swap_chain_info swap_chain = {};
+        swap_chain_info swap_chain = { };
         VkSemaphore image_available;
         VkSemaphore rendering_finished;
         bool is_debugging = false;
@@ -55,14 +60,13 @@ namespace vulkan {
 
     namespace debugging {
 
-        const char *validation_layer_names[] = {"VK_LAYER_LUNARG_standard_validation"};
+        const char* validation_layer_names[] = { "VK_LAYER_LUNARG_standard_validation" };
 
         VkDebugUtilsMessengerEXT debug_utils_messenger_cb;
 
         static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback( VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                                             VkDebugUtilsMessageTypeFlagsEXT messageType,
-                                                             const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-                                                             void *pUserData ) noexcept {
+            VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+            void* pUserData ) noexcept {
             (void)messageSeverity, (void)messageType, (void)pUserData;
 
             LOG_ERROR( VULKAN_DBG_TAG, " %1 %2", pCallbackData->messageIdNumber, pCallbackData->pMessage );
@@ -70,20 +74,20 @@ namespace vulkan {
             return VK_FALSE;
         }
 
-        auto CreateDebugUtilsMessengerEXT( VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
-                                           const VkAllocationCallbacks *pAllocator, VkDebugUtilsMessengerEXT *pCallback ) noexcept {
-            auto vkCreateDebugUtilsMessenger_fp =
-                (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr( instance, "vkCreateDebugUtilsMessengerEXT" );
+        auto CreateDebugUtilsMessengerEXT( VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+            const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pCallback ) noexcept {
+            auto vkCreateDebugUtilsMessenger_fp
+                = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr( instance, "vkCreateDebugUtilsMessengerEXT" );
             if ( vkCreateDebugUtilsMessenger_fp )
                 return vkCreateDebugUtilsMessenger_fp( instance, pCreateInfo, pAllocator, pCallback );
 
             return VK_ERROR_EXTENSION_NOT_PRESENT;
         }
 
-        void DestroyDebugUtilsMessengerEXT( VkInstance instance, VkDebugUtilsMessengerEXT callback,
-                                            const VkAllocationCallbacks *pAllocator ) noexcept {
-            auto vkDestroyDebugUtilsMessenger_fp =
-                (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr( instance, "vkDestroyDebugUtilsMessengerEXT" );
+        void DestroyDebugUtilsMessengerEXT(
+            VkInstance instance, VkDebugUtilsMessengerEXT callback, const VkAllocationCallbacks* pAllocator ) noexcept {
+            auto vkDestroyDebugUtilsMessenger_fp
+                = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr( instance, "vkDestroyDebugUtilsMessengerEXT" );
             if ( vkDestroyDebugUtilsMessenger_fp ) {
                 vkDestroyDebugUtilsMessenger_fp( instance, callback, pAllocator );
             }
@@ -92,12 +96,12 @@ namespace vulkan {
         auto setup( const VkInstance instance ) noexcept {
             LOG_DEBUG_CHECKPOINT( VULKAN_DBG_TAG );
 
-            VkDebugUtilsMessengerCreateInfoEXT create_info = {};
+            VkDebugUtilsMessengerCreateInfoEXT create_info = { };
             create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-            create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                          VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-            create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                                      VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+            create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+                | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+            create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+                | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
             create_info.pfnUserCallback = debugCallback;
             create_info.pUserData = nullptr;
 
@@ -113,7 +117,7 @@ namespace vulkan {
         }
     } // namespace debugging
 
-    constexpr const char *error_string( const VkResult code ) noexcept {
+    constexpr const char* error_string( const VkResult code ) noexcept {
         switch ( code ) {
 #define STR( r )                                                                                                                           \
     case VK_##r:                                                                                                                           \
@@ -152,7 +156,7 @@ namespace vulkan {
 
         VkInstance instance;
 
-        VkApplicationInfo app_info = {};
+        VkApplicationInfo app_info = { };
         app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
         app_info.pApplicationName = "Hello Triangle";
         app_info.applicationVersion = common::make_version<uint32_t>( 1, 0, 0 );
@@ -160,12 +164,12 @@ namespace vulkan {
         app_info.engineVersion = common::make_version<uint32_t>( 1, 0, 0 );
         app_info.apiVersion = VK_API_VERSION_1_0;
 
-        std::vector<const char *> extensions = {VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_XCB_SURFACE_EXTENSION_NAME};
+        std::vector<const char*> extensions = { VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_XCB_SURFACE_EXTENSION_NAME };
 
         if ( validation )
             extensions.push_back( VK_EXT_DEBUG_UTILS_EXTENSION_NAME );
 
-        VkInstanceCreateInfo create_info = {};
+        VkInstanceCreateInfo create_info = { };
         create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         create_info.pApplicationInfo = &app_info;
         create_info.enabledExtensionCount = std::size( extensions );
@@ -177,19 +181,19 @@ namespace vulkan {
 
         if ( result != VK_SUCCESS ) {
             LOG_ERROR( VULKAN_TAG, "%1", error_string( result ) );
-            return {};
+            return { };
         }
 
         uint32_t supported_extension_count = 0;
         if ( vkEnumerateInstanceExtensionProperties( nullptr, &supported_extension_count, nullptr ) != VK_SUCCESS ) {
-            return {};
+            return { };
         }
 
         std::vector<VkExtensionProperties> supported_extensions;
         supported_extensions.resize( supported_extension_count );
-        if ( vkEnumerateInstanceExtensionProperties( nullptr, &supported_extension_count, std::data( supported_extensions ) ) !=
-             VK_SUCCESS ) {
-            return {};
+        if ( vkEnumerateInstanceExtensionProperties( nullptr, &supported_extension_count, std::data( supported_extensions ) )
+            != VK_SUCCESS ) {
+            return { };
         }
 
         return instance;
@@ -203,9 +207,9 @@ namespace vulkan {
 
     namespace detail {
 
-        [[nodiscard]] auto check_extension_availability( std::string_view extension_name,
-                                                         const std::vector<VkExtensionProperties> &available_extensions ) noexcept {
-            for ( const auto &ext : available_extensions ) {
+        [[nodiscard]] auto check_extension_availability(
+            std::string_view extension_name, const std::vector<VkExtensionProperties>& available_extensions ) noexcept {
+            for ( const auto& ext : available_extensions ) {
                 if ( std::strcmp( ext.extensionName, extension_name.data( ) ) == 0 ) {
                     return true;
                 }
@@ -218,18 +222,18 @@ namespace vulkan {
             LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
             uint32_t extensions_count = 0;
-            if ( ( vkEnumerateDeviceExtensionProperties( physical_device, nullptr, &extensions_count, nullptr ) != VK_SUCCESS ) ||
-                 ( extensions_count == 0 ) )
+            if ( ( vkEnumerateDeviceExtensionProperties( physical_device, nullptr, &extensions_count, nullptr ) != VK_SUCCESS )
+                || ( extensions_count == 0 ) )
                 return false;
 
             std::vector<VkExtensionProperties> available_extensions;
             available_extensions.resize( extensions_count );
 
-            if ( vkEnumerateDeviceExtensionProperties( physical_device, nullptr, &extensions_count, &available_extensions[0] ) !=
-                 VK_SUCCESS )
+            if ( vkEnumerateDeviceExtensionProperties( physical_device, nullptr, &extensions_count, &available_extensions[0] )
+                != VK_SUCCESS )
                 return false;
 
-            std::vector<const char *> device_extensions_needed = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+            std::vector<const char*> device_extensions_needed = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
             for ( auto ext : device_extensions_needed )
                 if ( !check_extension_availability( ext, available_extensions ) )
@@ -246,7 +250,7 @@ namespace vulkan {
 
             if ( check_count_result != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", error_string( check_count_result ) );
-                return {};
+                return { };
             }
 
             std::vector<VkPhysicalDevice> devices;
@@ -256,14 +260,14 @@ namespace vulkan {
 
             if ( devices_result != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", error_string( check_count_result ) );
-                return {};
+                return { };
             }
 
             return devices;
         }
 
         auto is_device_suitable( VkPhysicalDevice physical_device, VkSurfaceKHR presentation_surface,
-                                 uint32_t &selected_graphics_queue_family_index, uint32_t &selected_present_queue_family_index ) {
+            uint32_t& selected_graphics_queue_family_index, uint32_t& selected_present_queue_family_index ) {
             LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
             if ( !check_available_device_extensions( physical_device ) ) {
@@ -310,7 +314,7 @@ namespace vulkan {
             vkGetPhysicalDeviceQueueFamilyProperties( physical_device, &queue_families_count, std::data( queue_family_properties ) );
 
             auto idx = 0;
-            for ( const auto &property : queue_family_properties ) {
+            for ( const auto& property : queue_family_properties ) {
                 vkGetPhysicalDeviceSurfaceSupportKHR( physical_device, idx, presentation_surface, &queue_present_support[idx] );
 
                 // Select first queue that supports graphics
@@ -348,18 +352,18 @@ namespace vulkan {
         }
 
         [[nodiscard]] auto pick_physical_device( const VkInstance instance, VkSurfaceKHR presentation_surface,
-                                                 uint32_t &selected_graphics_queue_family_index,
-                                                 uint32_t &selected_present_queue_family_index ) -> std::optional<VkPhysicalDevice> {
+            uint32_t& selected_graphics_queue_family_index, uint32_t& selected_present_queue_family_index )
+            -> std::optional<VkPhysicalDevice> {
             LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
             auto physical_devices = enumerate_physical_devices( instance );
             if ( physical_devices.empty( ) )
-                return {};
+                return { };
 
             auto selected_device_index = 0u;
-            for ( const auto &device : physical_devices ) {
-                if ( is_device_suitable( device, presentation_surface, selected_graphics_queue_family_index,
-                                         selected_present_queue_family_index ) )
+            for ( const auto& device : physical_devices ) {
+                if ( is_device_suitable(
+                         device, presentation_surface, selected_graphics_queue_family_index, selected_present_queue_family_index ) )
                     break;
 
                 selected_device_index++;
@@ -367,7 +371,7 @@ namespace vulkan {
 
             if ( selected_device_index >= physical_devices.size( ) ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Invalid device index" );
-                return {};
+                return { };
             }
 
             const auto physical_device = physical_devices[selected_device_index];
@@ -376,14 +380,14 @@ namespace vulkan {
         }
 
         [[nodiscard]] auto create_logical_device( VkPhysicalDevice physical_device, const uint32_t selected_graphics_queue_family_index,
-                                                  const uint32_t selected_present_queue_family_index ) -> std::optional<VkDevice> {
+            const uint32_t selected_present_queue_family_index ) -> std::optional<VkDevice> {
             LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
             std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
-            const float queue_priorities[] = {1.0f};
+            const float queue_priorities[] = { 1.0f };
 
             if ( selected_graphics_queue_family_index != UINT32_MAX ) {
-                VkDeviceQueueCreateInfo queue_create_info = {};
+                VkDeviceQueueCreateInfo queue_create_info = { };
                 queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
                 queue_create_info.queueFamilyIndex = selected_graphics_queue_family_index;
                 queue_create_info.queueCount = std::size( queue_priorities );
@@ -393,7 +397,7 @@ namespace vulkan {
             }
 
             if ( selected_graphics_queue_family_index != selected_present_queue_family_index ) {
-                VkDeviceQueueCreateInfo queue_create_info = {};
+                VkDeviceQueueCreateInfo queue_create_info = { };
                 queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
                 queue_create_info.queueFamilyIndex = selected_present_queue_family_index;
                 queue_create_info.queueCount = std::size( queue_priorities );
@@ -402,9 +406,9 @@ namespace vulkan {
                 queue_create_infos.push_back( queue_create_info );
             }
 
-            std::vector<const char *> extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+            std::vector<const char*> extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
-            VkDeviceCreateInfo device_create_info = {};
+            VkDeviceCreateInfo device_create_info = { };
             device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
             device_create_info.pQueueCreateInfos = std::data( queue_create_infos );
             device_create_info.queueCreateInfoCount = std::size( queue_create_infos );
@@ -415,7 +419,7 @@ namespace vulkan {
 
             if ( vkCreateDevice( physical_device, &device_create_info, nullptr, &device ) != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not create vulkan device!" );
-                return {};
+                return { };
             }
 
             return device;
@@ -430,7 +434,7 @@ namespace vulkan {
             vkDestroyDevice( device, nullptr );
         }
 
-        inline auto get_swap_chain_num_images( VkSurfaceCapabilitiesKHR &surface_capabilities ) {
+        inline auto get_swap_chain_num_images( VkSurfaceCapabilitiesKHR& surface_capabilities ) {
             uint32_t image_count = surface_capabilities.minImageCount + 2;
             if ( ( surface_capabilities.maxImageCount > 0 ) && ( image_count > surface_capabilities.maxImageCount ) ) {
                 image_count = surface_capabilities.maxImageCount;
@@ -439,12 +443,12 @@ namespace vulkan {
             return image_count;
         }
 
-        inline auto get_swap_chain_format( std::vector<VkSurfaceFormatKHR> &surface_formats ) {
+        inline auto get_swap_chain_format( std::vector<VkSurfaceFormatKHR>& surface_formats ) {
             if ( ( surface_formats.size( ) == 1 ) && ( surface_formats[0].format == VK_FORMAT_UNDEFINED ) ) {
-                return VkSurfaceFormatKHR{VK_FORMAT_R8G8B8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR};
+                return VkSurfaceFormatKHR { VK_FORMAT_R8G8B8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR };
             }
 
-            for ( VkSurfaceFormatKHR &surface_format : surface_formats ) {
+            for ( VkSurfaceFormatKHR& surface_format : surface_formats ) {
                 if ( surface_format.format == VK_FORMAT_R8G8B8A8_UNORM ) {
                     return surface_format;
                 }
@@ -453,9 +457,9 @@ namespace vulkan {
             return surface_formats[0];
         }
 
-        inline auto get_swap_chain_extent( VkSurfaceCapabilitiesKHR &surface_capabilities ) {
+        inline auto get_swap_chain_extent( VkSurfaceCapabilitiesKHR& surface_capabilities ) {
             if ( surface_capabilities.currentExtent.width == static_cast<uint32_t>( -1 ) ) {
-                VkExtent2D swap_chain_extent = {640, 480};
+                VkExtent2D swap_chain_extent = { 640, 480 };
                 if ( swap_chain_extent.width < surface_capabilities.minImageExtent.width ) {
                     swap_chain_extent.width = surface_capabilities.minImageExtent.width;
                 }
@@ -474,7 +478,7 @@ namespace vulkan {
             return surface_capabilities.currentExtent;
         }
 
-        inline auto get_swap_chain_usage_flags( VkSurfaceCapabilitiesKHR &surface_capabilities ) {
+        inline auto get_swap_chain_usage_flags( VkSurfaceCapabilitiesKHR& surface_capabilities ) {
             if ( surface_capabilities.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT ) {
                 return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
             }
@@ -484,7 +488,7 @@ namespace vulkan {
             return static_cast<VkImageUsageFlagBits>( -1 );
         }
 
-        inline auto get_swap_chain_transform( VkSurfaceCapabilitiesKHR &surface_capabilities ) {
+        inline auto get_swap_chain_transform( VkSurfaceCapabilitiesKHR& surface_capabilities ) {
             if ( surface_capabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR ) {
                 return VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
             } else {
@@ -492,20 +496,20 @@ namespace vulkan {
             }
         }
 
-        inline auto get_swap_chain_present_mode( const std::vector<VkPresentModeKHR> &present_modes ) {
-            for ( const auto &present_mode : present_modes ) {
+        inline auto get_swap_chain_present_mode( const std::vector<VkPresentModeKHR>& present_modes ) {
+            for ( const auto& present_mode : present_modes ) {
                 if ( present_mode == VK_PRESENT_MODE_MAILBOX_KHR ) {
                     return present_mode;
                 }
             }
 
-            for ( const auto &present_mode : present_modes ) {
+            for ( const auto& present_mode : present_modes ) {
                 if ( present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR ) {
                     return present_mode;
                 }
             }
 
-            for ( const auto &present_mode : present_modes ) {
+            for ( const auto& present_mode : present_modes ) {
                 if ( present_mode == VK_PRESENT_MODE_FIFO_KHR ) {
                     return present_mode;
                 }
@@ -516,10 +520,10 @@ namespace vulkan {
             return static_cast<VkPresentModeKHR>( -1 );
         }
 
-        auto create_swap_chain_image_views( VkDevice device, const VkFormat format, const std::vector<VkImage> &images )
+        auto create_swap_chain_image_views( VkDevice device, const VkFormat format, const std::vector<VkImage>& images )
             -> std::vector<image_info> {
             if ( images.empty( ) )
-                return {};
+                return { };
 
             std::vector<image_info> image_infos;
             image_infos.resize( images.size( ) );
@@ -528,16 +532,16 @@ namespace vulkan {
             for ( const auto img : images ) {
                 image_infos[ix].image = img;
 
-                VkImageViewCreateInfo image_view_create_info = {};
+                VkImageViewCreateInfo image_view_create_info = { };
                 image_view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
                 image_view_create_info.pNext = nullptr;
                 image_view_create_info.flags = 0;
                 image_view_create_info.image = images[ix];
                 image_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
                 image_view_create_info.format = format;
-                image_view_create_info.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                     VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
-                image_view_create_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+                image_view_create_info.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+                    VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+                image_view_create_info.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 
                 if ( const auto res = vkCreateImageView( device, &image_view_create_info, nullptr, &image_infos[ix].image_view );
                      res != VK_SUCCESS ) {
@@ -551,7 +555,7 @@ namespace vulkan {
         }
 
         [[nodiscard]] auto create_swap_chain( VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR presentation_surface,
-                                              VkSwapchainKHR swap_chain ) -> std::optional<swap_chain_info> {
+            VkSwapchainKHR swap_chain ) -> std::optional<swap_chain_info> {
             LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
             if ( device != VK_NULL_HANDLE ) {
@@ -563,7 +567,7 @@ namespace vulkan {
                  res != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "(%1) Could not check presentation surface capabilities!", error_string( res ) );
 
-                return {};
+                return { };
             }
 
             uint32_t formats_count;
@@ -572,34 +576,34 @@ namespace vulkan {
 
                 LOG_ERROR( VULKAN_TAG, "(%1) Error occurred during presentation surface formats enumeration!", error_string( res ) );
 
-                return {};
+                return { };
             }
 
             std::vector<VkSurfaceFormatKHR> surface_formats;
             surface_formats.resize( formats_count );
-            if ( const auto res =
-                     vkGetPhysicalDeviceSurfaceFormatsKHR( physical_device, presentation_surface, &formats_count, surface_formats.data( ) );
+            if ( const auto res
+                 = vkGetPhysicalDeviceSurfaceFormatsKHR( physical_device, presentation_surface, &formats_count, surface_formats.data( ) );
                  res != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "(%1) Error occurred during presentation surface formats enumeration!", error_string( res ) );
-                return {};
+                return { };
             }
 
             uint32_t present_modes_count;
-            if ( const auto res =
-                     vkGetPhysicalDeviceSurfacePresentModesKHR( physical_device, presentation_surface, &present_modes_count, nullptr );
+            if ( const auto res
+                 = vkGetPhysicalDeviceSurfacePresentModesKHR( physical_device, presentation_surface, &present_modes_count, nullptr );
                  ( res != VK_SUCCESS ) || ( present_modes_count == 0 ) ) {
                 LOG_ERROR( VULKAN_TAG, "(%1) Error occurred during presentation surface present modes enumeration!", error_string( res ) );
-                return {};
+                return { };
             }
 
             std::vector<VkPresentModeKHR> present_modes;
             present_modes.resize( present_modes_count );
 
-            if ( const auto res = vkGetPhysicalDeviceSurfacePresentModesKHR( physical_device, presentation_surface, &present_modes_count,
-                                                                             present_modes.data( ) );
+            if ( const auto res = vkGetPhysicalDeviceSurfacePresentModesKHR(
+                     physical_device, presentation_surface, &present_modes_count, present_modes.data( ) );
                  res != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "(%1) Error occurred during presentation surface present modes enumeration!", error_string( res ) );
-                return {};
+                return { };
             }
 
             const auto desired_number_of_images = get_swap_chain_num_images( surface_capabilities );
@@ -610,16 +614,16 @@ namespace vulkan {
             const auto desired_present_mode = get_swap_chain_present_mode( present_modes );
 
             if ( static_cast<int>( desired_usage ) == -1 ) {
-                return {};
+                return { };
             }
 
             if ( static_cast<int>( desired_present_mode ) == -1 ) {
-                return {};
+                return { };
             }
 
             if ( ( desired_extent.width == 0 ) || ( desired_extent.height == 0 ) ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Can't create swap chain" );
-                return {};
+                return { };
             }
 
             auto old_swap_chain = swap_chain;
@@ -654,7 +658,7 @@ namespace vulkan {
 
             if ( vkCreateSwapchainKHR( device, &swap_chain_create_info, nullptr, &swap_chain ) != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not create swap chain!" );
-                return {};
+                return { };
             }
 
             if ( old_swap_chain != VK_NULL_HANDLE ) {
@@ -665,14 +669,14 @@ namespace vulkan {
             if ( const auto res = vkGetSwapchainImagesKHR( device, swap_chain, &image_count, nullptr );
                  ( res != VK_SUCCESS ) || ( image_count == 0 ) ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not get swap chain images!" );
-                return {};
+                return { };
             }
 
             std::vector<VkImage> images;
             images.resize( image_count );
             if ( const auto res = vkGetSwapchainImagesKHR( device, swap_chain, &image_count, images.data( ) ); res != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not get swap chain images!" );
-                return {};
+                return { };
             }
 
             swap_chain_info info;
@@ -684,7 +688,7 @@ namespace vulkan {
             return info;
         }
 
-        auto destroy_swap_chain( VkDevice device, swap_chain_info &swap_chain ) {
+        auto destroy_swap_chain( VkDevice device, swap_chain_info& swap_chain ) {
             LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
             if ( swap_chain.swap_chain != VK_NULL_HANDLE ) {
@@ -692,7 +696,7 @@ namespace vulkan {
                 swap_chain.swap_chain = VK_NULL_HANDLE;
             }
 
-            for ( auto &img : swap_chain.images ) {
+            for ( auto& img : swap_chain.images ) {
                 vkDestroyImageView( device, img.image_view, nullptr );
                 img.image_view = VK_NULL_HANDLE;
             }
@@ -706,7 +710,7 @@ namespace vulkan {
             semaphore_create_info.pNext = nullptr;
             semaphore_create_info.flags = 0;
 
-            VkSemaphore sems[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+            VkSemaphore sems[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
 
             if ( const auto res = vkCreateSemaphore( device, &semaphore_create_info, nullptr, &sems[0] ); res != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not create semaphores!" );
@@ -716,7 +720,7 @@ namespace vulkan {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not create semaphores!" );
             }
 
-            return {sems[0], sems[1]};
+            return { sems[0], sems[1] };
         }
 
         auto create_command_buffers( VkDevice device, VkSwapchainKHR swap_chain, const uint32_t present_queue_family_index )
@@ -732,14 +736,14 @@ namespace vulkan {
             if ( const auto res = vkCreateCommandPool( device, &command_pool_create_info, nullptr, &present_queue_command_pool );
                  res != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1 Could not create a command pool!", res );
-                return {};
+                return { };
             }
 
             uint32_t image_count = 0;
             if ( const auto res = vkGetSwapchainImagesKHR( device, swap_chain, &image_count, nullptr );
                  ( res != VK_SUCCESS ) || ( image_count == 0 ) ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not get swap chain images!" );
-                return {};
+                return { };
             }
 
             std::vector<VkCommandBuffer> present_queue_command_buffers;
@@ -754,15 +758,15 @@ namespace vulkan {
 
             if ( vkAllocateCommandBuffers( device, &command_buffer_allocate_info, present_queue_command_buffers.data( ) ) != VK_SUCCESS ) {
                 LOG_ERROR( VULKAN_TAG, "%1", "Could not allocate command buffers!" );
-                return {};
+                return { };
             }
 
-            return {std::make_tuple( present_queue_command_pool, present_queue_command_buffers )};
+            return { std::make_tuple( present_queue_command_pool, present_queue_command_buffers ) };
         }
 
         //
-        auto record_command_buffers( VkDevice device, VkSwapchainKHR swap_chain,
-                                     const std::vector<VkCommandBuffer> &present_queue_command_buffers ) {
+        auto record_command_buffers(
+            VkDevice device, VkSwapchainKHR swap_chain, const std::vector<VkCommandBuffer>& present_queue_command_buffers ) {
             auto image_count = static_cast<uint32_t>( present_queue_command_buffers.size( ) );
 
             std::vector<VkImage> swap_chain_images( image_count );
@@ -772,15 +776,15 @@ namespace vulkan {
                 return false;
             }
 
-            VkCommandBufferBeginInfo command_buffer_begin_info = {};
+            VkCommandBufferBeginInfo command_buffer_begin_info = { };
             command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
             command_buffer_begin_info.pNext = nullptr;
             command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
             command_buffer_begin_info.pInheritanceInfo = nullptr;
 
-            const VkClearColorValue clear_color = {{0.23f, 0.23f, 0.23f, 0.0f}};
+            const VkClearColorValue clear_color = { { 0.23f, 0.23f, 0.23f, 0.0f } };
 
-            VkImageSubresourceRange image_subresource_range = {};
+            VkImageSubresourceRange image_subresource_range = { };
             image_subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             image_subresource_range.baseMipLevel = 0;
             image_subresource_range.levelCount = 1;
@@ -788,7 +792,7 @@ namespace vulkan {
             image_subresource_range.layerCount = 1;
 
             for ( uint32_t i = 0; i < image_count; ++i ) {
-                VkImageMemoryBarrier barrier_from_present_to_clear = {};
+                VkImageMemoryBarrier barrier_from_present_to_clear = { };
                 barrier_from_present_to_clear.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
                 barrier_from_present_to_clear.pNext = nullptr;
                 barrier_from_present_to_clear.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
@@ -800,7 +804,7 @@ namespace vulkan {
                 barrier_from_present_to_clear.image = swap_chain_images[i];
                 barrier_from_present_to_clear.subresourceRange = image_subresource_range;
 
-                VkImageMemoryBarrier barrier_from_clear_to_present = {};
+                VkImageMemoryBarrier barrier_from_clear_to_present = { };
                 barrier_from_clear_to_present.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
                 barrier_from_clear_to_present.pNext = nullptr;
                 barrier_from_clear_to_present.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -814,13 +818,13 @@ namespace vulkan {
 
                 vkBeginCommandBuffer( present_queue_command_buffers[i], &command_buffer_begin_info );
                 vkCmdPipelineBarrier( present_queue_command_buffers[i], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-                                      0, nullptr, 0, nullptr, 1, &barrier_from_present_to_clear );
+                    0, nullptr, 0, nullptr, 1, &barrier_from_present_to_clear );
 
                 vkCmdClearColorImage( present_queue_command_buffers[i], swap_chain_images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                      &clear_color, 1, &image_subresource_range );
+                    &clear_color, 1, &image_subresource_range );
 
                 vkCmdPipelineBarrier( present_queue_command_buffers[i], VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier_from_clear_to_present );
+                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier_from_clear_to_present );
                 if ( vkEndCommandBuffer( present_queue_command_buffers[i] ) != VK_SUCCESS ) {
                     LOG_ERROR( VULKAN_TAG, "%1", "Could not record command buffers!" );
                     return false;
@@ -832,7 +836,7 @@ namespace vulkan {
 
     } // namespace detail
 
-    [[nodiscard]] auto init( xcb_connection_t *connection, xcb_window_t window, const bool debugging_flag = true )
+    [[nodiscard]] auto init( xcb_connection_t* connection, xcb_window_t window, const bool debugging_flag = true )
         -> std::optional<context> {
         LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
@@ -842,40 +846,40 @@ namespace vulkan {
 
         auto instance = create_instance( debugging_flag );
         if ( !instance )
-            return {};
+            return { };
 
         if ( debugging_flag )
             if ( !debugging::setup( instance.value( ) ) )
-                return {};
+                return { };
 
         ctx.instance = instance.value( );
         ctx.is_debugging = debugging_flag;
 
-        VkXcbSurfaceCreateInfoKHR surface_create_info = {};
+        VkXcbSurfaceCreateInfoKHR surface_create_info = { };
         surface_create_info.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
         surface_create_info.connection = connection;
         surface_create_info.window = window;
 
         if ( vkCreateXcbSurfaceKHR( ctx.instance, &surface_create_info, nullptr, &ctx.presentation_surface ) != VK_SUCCESS ) {
             LOG_ERROR( VULKAN_TAG, "%1", "Could not create presentation surface!" );
-            return {};
+            return { };
         }
 
         auto selected_graphics_queue_family_index = UINT32_MAX;
         auto selected_present_queue_family_index = UINT32_MAX;
-        auto selected_physical_device = pick_physical_device( ctx.instance, ctx.presentation_surface, selected_graphics_queue_family_index,
-                                                              selected_present_queue_family_index );
+        auto selected_physical_device = pick_physical_device(
+            ctx.instance, ctx.presentation_surface, selected_graphics_queue_family_index, selected_present_queue_family_index );
         if ( !selected_physical_device ) {
             LOG_ERROR( VULKAN_TAG, "%1", "Could not select physical device based on the chosen properties!" );
-            return {};
+            return { };
         }
 
         ctx.physical_device = selected_physical_device.value( );
 
-        auto device =
-            create_logical_device( ctx.physical_device, selected_graphics_queue_family_index, selected_present_queue_family_index );
+        auto device
+            = create_logical_device( ctx.physical_device, selected_graphics_queue_family_index, selected_present_queue_family_index );
         if ( !device )
-            return {};
+            return { };
 
         ctx.device = device.value( );
 
@@ -884,33 +888,33 @@ namespace vulkan {
 
         const auto swap_chain = create_swap_chain( ctx.physical_device, ctx.device, ctx.presentation_surface, ctx.swap_chain.swap_chain );
         if ( !swap_chain )
-            return {};
+            return { };
 
         ctx.swap_chain = swap_chain.value( );
 
         auto [image_available, rendering_finished] = create_semaphores( ctx.device );
         if ( ctx.image_available = image_available; image_available == VK_NULL_HANDLE )
-            return {};
+            return { };
 
         if ( ctx.rendering_finished = rendering_finished; rendering_finished == VK_NULL_HANDLE )
-            return {};
+            return { };
 
         auto command_buffers = create_command_buffers( ctx.device, ctx.swap_chain.swap_chain, ctx.present_queue.family_index );
         if ( !command_buffers )
-            return {};
+            return { };
 
         auto [command_pool, buffers] = command_buffers.value( );
         ctx.present_queue_command_pool = command_pool;
         ctx.present_queue_command_buffers = buffers;
 
         if ( !record_command_buffers( ctx.device, ctx.swap_chain.swap_chain, ctx.present_queue_command_buffers ) ) {
-            return {};
+            return { };
         }
 
         return ctx;
     }
 
-    auto cleanup( context &ctx ) noexcept {
+    auto cleanup( context& ctx ) noexcept {
         LOG_DEBUG_CHECKPOINT( VULKAN_TAG );
 
         using namespace detail;
@@ -919,8 +923,7 @@ namespace vulkan {
 
         if ( ( ctx.present_queue_command_buffers.size( ) > 0 ) && ( ctx.present_queue_command_buffers[0] != VK_NULL_HANDLE ) ) {
             vkFreeCommandBuffers( ctx.device, ctx.present_queue_command_pool,
-                                  static_cast<uint32_t>( ctx.present_queue_command_buffers.size( ) ),
-                                  ctx.present_queue_command_buffers.data( ) );
+                static_cast<uint32_t>( ctx.present_queue_command_buffers.size( ) ), ctx.present_queue_command_buffers.data( ) );
             ctx.present_queue_command_buffers.clear( );
         }
 
@@ -937,20 +940,22 @@ namespace vulkan {
 
         destroy_swap_chain( ctx.device, ctx.swap_chain );
 
+        destroy_logical_device( ctx.device );
+
+        vkDestroySurfaceKHR( ctx.instance, ctx.presentation_surface, nullptr );
+
         if ( ctx.is_debugging )
             debugging::cleanup( ctx.instance );
-
-        destroy_logical_device( ctx.device );
 
         destroy_instance( ctx.instance );
     }
 
-    auto submit_and_present( context &ctx ) {
+    auto submit_and_present( context& ctx ) {
         LOG_DEBUG_CHECKPOINT_ONCE( VULKAN_TAG );
 
         uint32_t image_index = 0;
-        switch ( const auto result = vkAcquireNextImageKHR( ctx.device, ctx.swap_chain.swap_chain, UINT64_MAX, ctx.image_available,
-                                                            VK_NULL_HANDLE, &image_index );
+        switch ( const auto result = vkAcquireNextImageKHR(
+                     ctx.device, ctx.swap_chain.swap_chain, UINT64_MAX, ctx.image_available, VK_NULL_HANDLE, &image_index );
                  result ) {
         case VK_SUCCESS:
         case VK_SUBOPTIMAL_KHR:
@@ -962,7 +967,7 @@ namespace vulkan {
         }
 
         const VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        VkSubmitInfo submit_info = {};
+        VkSubmitInfo submit_info = { };
         submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submit_info.pNext = nullptr;
         submit_info.waitSemaphoreCount = 1;
@@ -977,7 +982,7 @@ namespace vulkan {
             LOG_ERROR( VULKAN_TAG, "%1 Submit error!", res );
         }
 
-        VkPresentInfoKHR present_info = {};
+        VkPresentInfoKHR present_info = { };
         present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         present_info.pNext = nullptr;
         present_info.waitSemaphoreCount = 1;

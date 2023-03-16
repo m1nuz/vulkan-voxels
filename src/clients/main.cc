@@ -20,7 +20,16 @@ volatile int log_level = DEFAULT_LOG_LEVEL;
 
 namespace app {
 
-    auto run( std::function<void( const event_t & )> on_event ) {
+    auto on_initialize( ) -> void {
+    }
+
+    auto on_update( ) -> void {
+    }
+
+    auto on_finalize( ) -> void {
+    }
+
+    auto run( std::function<void( const event_t& )> on_event ) {
         LOG_INFO( APP_TAG, "%1", "Startup" );
 
         auto display_instance = syswm::create_instance( );
@@ -35,7 +44,7 @@ namespace app {
             return EXIT_FAILURE;
         }
 
-        on_event( syswm::on_init{} );
+        on_event( syswm::on_init { } );
 
         constexpr auto timestep = 0.005;
         auto current_time = std::chrono::high_resolution_clock::now( );
@@ -46,8 +55,8 @@ namespace app {
         LOG_INFO( APP_TAG, "%1", "Running..." );
 
         // Main message loop
-        while ( display_instance.value().running ) {
-            syswm::poll_events( display_instance.value() );
+        while ( display_instance.value( ).running ) {
+            syswm::poll_events( display_instance.value( ) );
 
             last_time = current_time;
             current_time = std::chrono::high_resolution_clock::now( );
@@ -57,19 +66,19 @@ namespace app {
             while ( dt_accumulator >= timestep ) {
                 dt_accumulator -= timestep;
 
-                on_event( syswm::on_update{} );
+                on_event( syswm::on_update { } );
 
                 timesteps++;
             }
 
             const auto interpolation = dt_accumulator / timestep;
 
-            on_event( syswm::on_present{static_cast<float>( interpolation ), timesteps} );
+            on_event( syswm::on_present { static_cast<float>( interpolation ), timesteps } );
 
             vulkan::submit_and_present( vk_instance.value( ) );
         }
 
-        on_event( syswm::on_done{} );
+        on_event( syswm::on_done { } );
 
         vulkan::cleanup( vk_instance.value( ) );
 
@@ -82,12 +91,12 @@ namespace app {
 
 } // namespace app
 
-extern int main( int argc, char *argv[] ) {
+extern int main( int argc, char* argv[] ) {
     (void)argc, (void)argv;
 
-    return app::run( []( const auto &ev ) {
+    return app::run( []( const auto& ev ) {
         std::visit(
-            []( auto &&arg ) {
+            []( auto&& arg ) {
                 using T = std::decay_t<decltype( arg )>;
 
                 if constexpr ( std::is_same_v<T, app::syswm::on_init> ) {
