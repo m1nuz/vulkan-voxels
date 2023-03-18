@@ -1,0 +1,3 @@
+#pragma once
+
+constexpr char WINDOW_TITLE[] = "Vulkan Voxels";

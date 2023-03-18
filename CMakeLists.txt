@@ -1,68 +1,22 @@
-cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
-
-project(vulkan-voxels)
+cmake_minimum_required(VERSION 3.0.0)
+project(vulkan-voxels VERSION 0.1.0)
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
-set(APP_NAME vv-client)
-set(INSTALL_DIR /usr/bin)
-set(SHARED_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
-set(HEADERS
-    include/vulkan.h
-    include/config.hh)
-set(SOURCES
-    src/clients/application.hpp
-    src/clients/client.cpp
-)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(SHARED_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 
-find_package(GLM REQUIRED)
-find_package(Vulkan REQUIRED)
-find_package(XCB REQUIRED)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
-configure_file("${SHARED_INCLUDE_DIR}/config.h.in" "${SHARED_INCLUDE_DIR}/config.hh")
+include(fmt)
 
-add_executable(${APP_NAME} ${SOURCES} ${HEADERS})
+# include(CTest)
+# enable_testing()
+add_subdirectory(src/client)
 
-set_target_properties(${APP_NAME} PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED YES
-    CXX_EXTENSIONS NO
-)
-
-target_include_directories(${APP_NAME} PUBLIC
-    ${SHARED_INCLUDE_DIR}
-    ${GLM_INCLUDE_DIR}
-    ${VULKAN_INCLUDE_DIR}
-    ${XCB_INCLUDES}
-    external
-)
-
-if (UNIX)
-    target_compile_options(${APP_NAME} PUBLIC
-        -pthread
-        -pedantic
-        -Wall
-        -Wextra
-        -Wshadow
-        -Wpointer-arith
-        -Wcast-qual
-        -Wunused-result
-        )
-elseif (MSVC)
-    target_compile_options(${APP_NAME} PUBLIC
-        /W3
-#        /WX
-        )
-endif()
-
-message(XCB_LIBRARIES=${XCB_LIBRARIES})
-
-target_link_libraries(${APP_NAME} PUBLIC
-    ${APP_LIBRARIES}
-    ${VULKAN_LIBRARY}
-    ${XCB_LIBRARIES}
-)
-
-target_compile_definitions(${APP_NAME} PUBLIC -DVK_USE_PLATFORM_XCB_KHR)
-
-install(TARGETS ${APP_NAME} RUNTIME DESTINATION ${INSTALL_DIR})
+# set(CPACK_PROJECT_NAME ${PROJECT_NAME})
+# set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
+# include(CPack)
