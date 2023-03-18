@@ -10,6 +10,8 @@
 #include "config.hpp"
 
 #include "Event.hpp"
+#include "Renderer.hpp"
+#include "World.hpp"
 
 namespace Application {
 
@@ -28,6 +30,9 @@ using Threads = std::vector<std::jthread>;
 struct Window;
 
 struct Application {
+    Game::World _world;
+    Game::Renderer _renderer;
+
     Threads _threads;
     EventQueue _events;
     std::shared_ptr<Window> _window;

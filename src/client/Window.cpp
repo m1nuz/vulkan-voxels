@@ -21,10 +21,25 @@ static auto center_window(GLFWwindow* window, GLFWmonitor* monitor) {
     glfwSetWindowPos(window, monitor_x + (mode->width - width) / 2, monitor_y + (mode->height - height) / 2);
 }
 
-[[nodiscard]] auto process_window_events(std::shared_ptr<Window> w) -> bool {
+static auto is_key_pressed(std::shared_ptr<Window> window, int key) noexcept -> bool {
+    return glfwGetKey(window->window, key) == GLFW_PRESS;
+}
+
+static auto is_mouse_pressed(std::shared_ptr<Window> window, int button) noexcept -> bool {
+    return glfwGetMouseButton(window->window, button) == GLFW_PRESS;
+}
+
+[[nodiscard]] auto process_window_events(std::shared_ptr<Window> w, Input& input) -> bool {
     if (glfwWindowShouldClose(w->window)) {
         return false;
     }
+
+    input.forward = is_key_pressed(w, GLFW_KEY_W);
+    input.backward = is_key_pressed(w, GLFW_KEY_S);
+    input.left = is_key_pressed(w, GLFW_KEY_D);
+    input.right = is_key_pressed(w, GLFW_KEY_A);
+    input.button_left = is_mouse_pressed(w, GLFW_MOUSE_BUTTON_LEFT);
+    input.button_right = is_mouse_pressed(w, GLFW_MOUSE_BUTTON_RIGHT);
 
     glfwPollEvents();
     return true;

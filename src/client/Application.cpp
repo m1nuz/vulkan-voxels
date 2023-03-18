@@ -14,12 +14,20 @@ static auto process_events(Application& app) {
     }
 }
 
+static auto cleanup(Application& app) -> void {
+    destroy_window(app._window);
+
+    glfwTerminate();
+
+    Journal::message(Tags::App, "Shutdown");
+}
+
 auto run(Configuration& conf, Application& app) -> int {
     Journal::message(Tags::App, "Start");
 
     if (glfwInit() != GLFW_TRUE) {
         Journal::critical(Tags::App, "Initialization failed!");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     app._window = create_window({ .title = conf.title, .width = conf.window_width, .height = conf.window_height });
@@ -27,14 +35,17 @@ auto run(Configuration& conf, Application& app) -> int {
     app._running = true;
     while (app._running) {
         process_events(app);
-        app._running = process_window_events(app._window);
+
+        Input input;
+        app._running = process_window_events(app._window, input);
+
+        Game::update_world(app._world);
+
+        Game::present(app._renderer, app._world);
     }
 
-    destroy_window(app._window);
+    cleanup(app);
 
-    glfwTerminate();
-
-    Journal::message(Tags::App, "Shutdown");
     return EXIT_SUCCESS;
 }
 

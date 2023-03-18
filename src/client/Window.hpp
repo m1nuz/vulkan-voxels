@@ -21,8 +21,18 @@ struct CreateWindowInfo {
     bool centered = true;
 };
 
+struct Input {
+    bool forward = false;
+    bool backward = false;
+    bool right = false;
+    bool left = false;
+
+    bool button_left = false;
+    bool button_right = false;
+};
+
 auto create_window(const CreateWindowInfo& info) -> std::shared_ptr<Window>;
 auto destroy_window(std::shared_ptr<Window> w) -> void;
-auto process_window_events(std::shared_ptr<Window> w) -> bool;
+auto process_window_events(std::shared_ptr<Window> w, Input& input) -> bool;
 
 } // namespace Application

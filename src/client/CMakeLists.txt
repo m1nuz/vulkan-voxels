@@ -12,6 +12,14 @@ add_executable(${APP_NAME}
     Journal.cpp
     Application.cpp
     Window.cpp
+    Renderer.cpp
+    World.cpp
+    Chunk.cpp
+    Camera.cpp
+    Frustum.cpp
+    Plane.cpp
+    Storage.cpp
+    TextureAtlas.cpp
     main.cpp
 )
 
