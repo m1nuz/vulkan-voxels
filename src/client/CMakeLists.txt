@@ -15,11 +15,13 @@ add_executable(${APP_NAME}
     Renderer.cpp
     World.cpp
     Chunk.cpp
+    Block.cpp
     Camera.cpp
     Frustum.cpp
     Plane.cpp
     Storage.cpp
     TextureAtlas.cpp
+    ImageLoader.cpp
     main.cpp
 )
 
@@ -42,14 +44,18 @@ target_include_directories(${APP_NAME}
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${Vulkan_INCLUDE_DIRS}>
+    PRIVATE
+    $<BUILD_INTERFACE:${stb_image_SOURCE_DIR}>
 )
 
 target_link_libraries(${APP_NAME}
     PUBLIC
-    ${GLFW_STATIC_LIBRARIES}
-    ${Vulkan_LIBRARIES}
     fmt::fmt
     stdc++
     stdc++fs
     Threads::Threads
+    PRIVATE
+    ${GLFW_STATIC_LIBRARIES}
+    ${Vulkan_LIBRARIES}
+    nlohmann_json::nlohmann_json
 )

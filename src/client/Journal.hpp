@@ -28,9 +28,10 @@ namespace v3 {
     }
 
     template <typename... Args> inline auto warning(const std::string_view tag, Args&&... args) -> void {
-        const auto str = fmt::format(std::forward<Args>(args)...);
         const auto t = std::time(nullptr);
         const auto style = fg(fmt::terminal_color::bright_yellow);
+        const auto str = fmt::format(style, std::forward<Args>(args)...);
+
         fmt::print("{:%Y-%m-%d %H-%M-%S} W: [{}] {}\n", fmt::localtime(t), tag, str);
     }
 

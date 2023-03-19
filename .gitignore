@@ -35,3 +35,4 @@
 /build/*
 /include/config.hh
 *.user
+.vscode

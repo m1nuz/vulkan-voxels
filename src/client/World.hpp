@@ -13,6 +13,7 @@ struct World {
 };
 
 auto create_world() -> World;
+auto destroy_world(World& world) -> void;
 auto update_world(World& world) -> void;
 
 } // namespace Game

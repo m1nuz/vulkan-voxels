@@ -1,5 +1,7 @@
 #include "Application.hpp"
+#include "Content.hpp"
 #include "Journal.hpp"
+#include "Renderer.hpp"
 #include "Tags.hpp"
 #include "Window.hpp"
 
@@ -30,7 +32,18 @@ auto run(Configuration& conf, Application& app) -> int {
         exit(EXIT_FAILURE);
     }
 
+    const auto block_info_filepath = "../assets/resources.json";
+
+    auto content = Content::read<std::string>(block_info_filepath);
+    if (!content) {
+        Journal::critical(Tags::App, "Failed to load blocks info from file='{}'!", block_info_filepath);
+        exit(EXIT_FAILURE);
+    }
+
     app._window = create_window({ .title = conf.title, .width = conf.window_width, .height = conf.window_height });
+
+    app._renderer
+        = Game::create_renderer({ .block_types = Game::get_block_types(*content), .texture_atlas = Graphics::get_texture_atlas(*content) });
 
     app._running = true;
     while (app._running) {

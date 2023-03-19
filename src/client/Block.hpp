@@ -2,6 +2,7 @@
 
 #include "Math.hpp"
 
+#include <string>
 #include <vector>
 
 namespace Game {
@@ -36,5 +37,7 @@ static const std::vector<vec3> BlockTopFace
     = { { -0.5f, 0.5f, -0.5f }, { 0.5f, 0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f }, { -0.5f, 0.5f, 0.5f } };
 static const std::vector<vec3> BlockBottomFace
     = { { -0.5f, -0.5f, 0.5f }, { 0.5f, -0.5f, 0.5f }, { 0.5f, -0.5f, -0.5f }, { -0.5f, -0.5f, -0.5f } };
+
+auto get_block_types(std::string_view info) -> BlockTypes;
 
 } // namespace Game
